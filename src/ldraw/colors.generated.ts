@@ -359,3 +359,7 @@ export function isTranslucent(code: number): boolean {
   const alpha = LDRAW_COLORS[code]?.alpha
   return alpha !== undefined && alpha < 255
 }
+
+export function hasColor(code: number): boolean {
+  return LDRAW_COLORS[code] !== undefined
+}

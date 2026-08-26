@@ -27,6 +27,22 @@ export function stubBrowser(reducedMotion = false): void {
   Element.prototype.releasePointerCapture = () => undefined;
   Element.prototype.hasPointerCapture = () => false;
 
+  // jsdom has no ResizeObserver, and every canvas here lives inside one.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      disconnect(): void {
+        // Nothing observed.
+      }
+      observe(): void {
+        // Nothing to report: tests drive resize() directly.
+      }
+      unobserve(): void {
+        // Nothing observed.
+      }
+    }
+  );
+
   HTMLCanvasElement.prototype.getBoundingClientRect = () =>
     ({
       bottom: VIEWPORT.height,

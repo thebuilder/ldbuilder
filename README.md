@@ -10,6 +10,11 @@ needs, and a piece dropped near the right one clicks into place. Progress is
 saved in the browser, so a set with eight hundred steps in it can be picked up
 where you left off.
 
+Or build something nobody designed. **Free build** is a floor, a box of two
+hundred parts in any colour the library defines, and no instructions: take a
+part or tip out fifty, turn them, stack them on the stud grid, and export the
+result as an LDraw file you can open anywhere else.
+
 Next.js 16 + three.js. No accounts, no server-side rendering of anything heavy,
 no parts library needed to run it.
 
@@ -61,6 +66,7 @@ model builds, and the viewer is told which parts are absent.
 pnpm ldraw:setup     # download + extract the parts library (138 MB, gitignored)
 pnpm ldraw:colors    # LDConfig.ldr -> src/ldraw/colors.generated.ts
 pnpm ldraw:pack      # pack the curated models into public/models
+pnpm ldraw:palette   # pack the free-build parts into public/parts
 pnpm ldraw:demos     # regenerate the two generated demo models
 pnpm ldraw:index     # rescrape the searchable OMR set list
 
@@ -124,6 +130,30 @@ there would be nowhere to put the result.
 
 A set number typed in full opens whether or not the index knows about it, so
 nothing breaks if it does go stale.
+
+### The free-build palette
+
+Free build needs a different kind of pack. A model pack holds the parts that
+model uses; a palette pack holds the parts a person might reach for.
+
+```bash
+pnpm ldraw:palette   # public/parts/palette.mpd + palette.json
+```
+
+`scripts/lib/palette-select.mjs` picks them. The library has 20,000 real parts
+in it, most of which are a printed variant of another part, a Duplo mould, or a
+licensed minifigure, so selection is by rule rather than by a hand-written list
+of part numbers: a list would go stale against a library that gains parts every
+release, and would be a hundred numbers nobody could check. The rules read each
+part's own description, which is where LDraw already records what something is
+and how big it is, and they yield 194 parts across nine groups — 1.9MB packed,
+280KB over the wire, loaded only when the sandbox is opened.
+
+Every part goes in with colour 16, LDraw's "inherit from whoever used me", which
+at the top level means nothing has decided yet. That is the point: one copy of
+the geometry serves every colour, and a colour is chosen per instance at runtime
+by redirecting the two materials that stand for an inherited surface and an
+inherited edge.
 
 ### Bringing your own
 
@@ -263,6 +293,35 @@ from both the gallery and the builder's initial HTML and only downloads once a
 model is opened, alongside the model itself. Switching to the non-compat build
 would serve the wasm as its own cacheable file and drop the base64 overhead.
 
+**Free build.** Real LEGO connects stud to tube, and knowing where a given
+part's studs are means connectivity data the LDraw library does not carry;
+LDCad keeps a whole parallel set of "shadow" files for it. What the library does
+guarantee is the grid the system is cut to: 20 units between studs, 8 for the
+height of a plate, three plates to a brick. Snapping to that grid and resting
+each part on whatever is under it gets stud-accurate building out of geometry
+that is already there, and is wrong only for the parts that are themselves
+off-grid, which are the same parts a person places by eye anyway.
+
+Two details that are easy to get wrong. A part's origin is at the middle of its
+footprint, so where that middle lands depends on whether the footprint is an odd
+or an even number of studs across: a 2x4 brick straddles grid lines and a 1x1
+sits on the middle of a stud. Rounding without accounting for that puts every
+odd part half a stud out, which is the one error that makes a build impossible
+to line up. And height is found by resting rather than rounding, because a slope
+is not a whole number of plates tall and a brick placed on one should sit on its
+top rather than at the nearest multiple of 8.
+
+Rotations are held as quarter turns rather than as a quaternion, because they
+are only ever quarter turns: it keeps the save small, keeps the arithmetic exact
+however many times a part is turned, and means an exported model has clean
+integers in it rather than 0.9999999.
+
+**Exporting.** A `.ldr` is a list of type-1 lines, each one a colour, a 3x3
+rotation, a translation and a part to apply them to. The only thing to get right
+is the frame: the app turns every part upright when it loads it, so writing one
+back out means turning it down again. That turn is a half turn about X, which is
+its own inverse, so the same matrix does both jobs.
+
 **Tests.** `pnpm test` runs vitest over the half of the app that is not a
 renderer: the build state machine, the saved-game store, the live physics world,
 the slot ghosts, and the scene-graph bookkeeping. three.js and rapier both work
@@ -332,7 +391,9 @@ repacking a model invalidates it rather than corrupting it.
 **State.** Anything you would want to share or keep across a refresh lives in
 the URL via nuqs: `?flow=`, `?step=`, `?mode=`, `?explode=`, `?slice=`, `?sub=`,
 `?sel=`. Build progress is the exception: it is far too big for a URL and is
-meaningless to anyone else, so it lives in `localStorage` instead.
+meaningless to anyone else, so it lives in `localStorage` instead. A free build
+is the same, minus the model to check it against; what it has instead is part
+names, and a part that has since left the palette is dropped on the way back in.
 `step` counts steps already finished, so `0` is an untouched pile and a value
 equal to the step count is a finished model.
 Per-frame playback state stays in the scene controller and never round-trips
@@ -362,6 +423,23 @@ In build mode:
 | Flick and release | Throw it |
 | Press a brick twice | Send it to its slot |
 | F | Highlight the pieces this step still needs |
+
+In free build:
+
+| | |
+| --- | --- |
+| 1-9 | Reach for a hotbar slot |
+| Click | Put down what is in hand, or pick up what is under the pointer |
+| R / Shift R | Turn a quarter circle |
+| T | Tip on its side |
+| Arrows | Nudge a stud at a time |
+| PgUp / PgDn | Raise or lower by a plate |
+| Esc | Put it back |
+| Del | Throw it away |
+
+The arrows belong to the camera until something is being carried, at which point
+they belong to the brick: a stud at a time is what "not quite there" needs, and
+the camera can wait.
 
 The full list lives behind the `?` in the View panel. Movement pans the camera
 and its orbit target together, so it is not walking: wherever you stop, dragging
@@ -422,7 +500,8 @@ src/test/          fixtures and stubs shared by the unit tests
 public/models/     committed self-contained .mpd files + manifest
 public/ldraw/      LDConfig.ldr, the colour table
 demo-models/       source for the generated demos
-src/ldraw/         loading, flattening, steps, bags, floor layout
+public/parts/      the free-build palette: one .mpd plus its catalogue
+src/ldraw/         loading, flattening, steps, bags, floor layout, palette
 src/scene/         renderer, assembly state machine, live physics, build rules
 src/components/    viewer stage and HUD panels
 ```

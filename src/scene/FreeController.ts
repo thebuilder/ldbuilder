@@ -1,0 +1,816 @@
+import {
+  Box3,
+  type Mesh,
+  Plane,
+  Quaternion,
+  Ray,
+  Raycaster,
+  Vector2,
+  Vector3,
+} from "three";
+import {
+  instantiate,
+  loadPalette,
+  type Palette,
+  type PalettePart,
+} from "@/ldraw/palette";
+import type { Brick } from "@/ldraw/types";
+import { readFreeBuild, writeFreeBuild } from "@/lib/freeStore";
+import {
+  boxFor,
+  orientation,
+  type Placement,
+  rotatedCenter,
+  rotatedHalfExtents,
+  STUD,
+  snapPlacement,
+  toLdrawFile,
+} from "./freeBuild";
+import { LiveWorld } from "./liveWorld";
+import { loadPhysics } from "./physics";
+import { RenderLoop } from "./RenderLoop";
+import { Viewport } from "./Viewport";
+
+/**
+ * Free build: a floor, a box of parts, and nothing telling you what to make.
+ *
+ * The difference from the guided flow is not the rendering, which is the same
+ * room, but what a brick can be. There, a brick is one of a model's parts and
+ * the only question is whether it is in yet. Here a brick is created on demand,
+ * can be picked back up, and goes wherever the grid allows.
+ *
+ * Three states, and every brick is in exactly one. **Loose** bricks are dynamic
+ * bodies lying on the floor, which is what "tip fifty onto the ground" makes.
+ * A **carried** brick has left physics and follows the pointer, snapped. A
+ * **placed** brick is at an exact grid pose with a static collider, so the pile
+ * piles against the model.
+ */
+
+/** Height the loose pile is dropped from, and what gravity is scaled by. */
+const WORLD_UNIT = 400;
+const FLOOR_Y = 0;
+
+/** Half the floor an empty build opens onto, in LDraw units: ten studs each way. */
+const DEFAULT_VIEW = STUD * 10;
+
+/** Bricks tipped out land in a patch this wide, so they do not stack into a tower. */
+const POUR_SPREAD = 120;
+
+/** The most that can be tipped out at once; a pile past this is unsearchable. */
+const MAX_POUR = 50;
+
+/** How fast a carried brick eases to the pose the grid picked for it. */
+const CARRY_LAMBDA = 22;
+
+const SAVE_INTERVAL_MS = 1500;
+
+export interface Armed {
+  colorCode: number;
+  file: string;
+}
+
+export interface CarriedInfo {
+  blocked: boolean;
+  colorCode: number;
+  file: string;
+  name: string;
+  /** Grid steps the person has nudged it by. */
+  nudge: { x: number; y: number; z: number };
+  tip: number;
+  yaw: number;
+}
+
+export interface FreeProgress {
+  carrying: CarriedInfo | null;
+  loose: number;
+  placed: number;
+  /** Set when the palette could not be loaded or physics is missing. */
+  problem: string | null;
+  ready: boolean;
+}
+
+export interface FreeCallbacks {
+  onProgress?: (progress: FreeProgress) => void;
+}
+
+interface Carried {
+  blocked: boolean;
+  brick: Brick;
+  /** Where it came from, so cancelling can put it back. */
+  from: "inventory" | "loose" | "placed";
+  nudge: { x: number; y: number; z: number };
+  part: PalettePart;
+  tip: number;
+  yaw: number;
+}
+
+export class FreeController {
+  private readonly viewport: Viewport;
+  private readonly canvas: HTMLCanvasElement;
+  private readonly raycaster = new Raycaster();
+  private readonly pointer = new Vector2();
+
+  private palette: Palette | null = null;
+  private world: LiveWorld | null = null;
+  private callbacks: FreeCallbacks = {};
+
+  /** Every instance ever made, by id. Holes are instances that were deleted. */
+  private readonly instances: (Brick | undefined)[] = [];
+  private readonly placements = new Map<number, Placement>();
+  private readonly placedBoxes = new Map<number, Box3>();
+  private readonly loose = new Set<number>();
+  private carried: Carried | null = null;
+  private armed: Armed | null = null;
+
+  private nextId = 0;
+  private readonly loop = new RenderLoop((dt) => this.tick(dt));
+  private problem: string | null = null;
+  private lastReport = "";
+  private saveDirty = false;
+  private lastSaveAt = 0;
+
+  private readonly ray = new Ray();
+  private readonly groundPlane = new Plane(new Vector3(0, 1, 0), -FLOOR_Y);
+  private readonly desired = new Vector3();
+  private readonly snapped = new Vector3();
+  private readonly halfExtents = new Vector3();
+  private readonly center = new Vector3();
+  private readonly quaternion = new Quaternion();
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
+    this.viewport = new Viewport(canvas);
+    // The arrows nudge whatever is being carried, and only fall back to the
+    // camera when nothing is in hand.
+    this.viewport.setOptions({ wantsArrows: () => this.carried === null });
+
+    canvas.addEventListener("pointermove", this.handlePointerMove);
+    window.addEventListener("pointerdown", this.handlePointerDown, true);
+    window.addEventListener("pagehide", this.handlePageHide);
+    document.addEventListener("visibilitychange", this.handlePageHide);
+  }
+
+  setCallbacks(callbacks: FreeCallbacks): void {
+    this.callbacks = callbacks;
+  }
+
+  /** Load the parts and open the floor. Reports what went wrong if it cannot. */
+  async open(palette: Palette | null, resume: boolean): Promise<void> {
+    if (palette) {
+      this.palette = palette;
+    } else {
+      try {
+        this.palette = await loadPalette();
+      } catch (error) {
+        this.problem =
+          error instanceof Error ? error.message : "the parts could not load";
+        this.report(true);
+        return;
+      }
+    }
+
+    // The solver is a WebAssembly module loaded on demand. Free build cannot
+    // do without it: the loose pile is the physics.
+    await loadPhysics();
+    const world = LiveWorld.create(FLOOR_Y, WORLD_UNIT, new Vector3());
+    if (!world) {
+      this.problem = "the physics engine could not load";
+      this.report(true);
+      return;
+    }
+    this.world = world;
+
+    if (resume) {
+      this.restore();
+    }
+    this.frame();
+    this.report(true);
+  }
+
+  get ready(): boolean {
+    return this.palette !== null && this.world !== null;
+  }
+
+  // ------------------------------------------------------------- inventory
+
+  arm(armed: Armed | null): void {
+    this.armed = armed;
+    // Changing the colour while something is in hand recolours it, which is
+    // what "try it in red" has to mean when a brick is already on the pointer.
+    const { carried } = this;
+    if (carried && armed && armed.file === carried.brick.partFile) {
+      this.recolourCarried(armed.colorCode);
+    }
+  }
+
+  /** Take one out of the box and put it on the pointer. */
+  takeOut(file: string, colorCode: number): void {
+    const part = this.palette?.byFile.get(file.toLowerCase());
+    if (!(part && this.palette)) {
+      return;
+    }
+    this.cancelCarry();
+
+    const brick = this.makeInstance(part, colorCode);
+    this.viewport.scene.add(brick.object);
+    this.carried = {
+      blocked: false,
+      brick,
+      from: "inventory",
+      nudge: { x: 0, y: 0, z: 0 },
+      part,
+      tip: 0,
+      yaw: 0,
+    };
+    this.report();
+  }
+
+  /**
+   * Tip a handful onto the floor.
+   *
+   * They arrive as a physical pile rather than in a neat row, because a box of
+   * parts is a pile and picking through one is half of building.
+   */
+  pourOut(file: string, colorCode: number, count: number): void {
+    const part = this.palette?.byFile.get(file.toLowerCase());
+    const { world } = this;
+    if (!(part && world && this.palette)) {
+      return;
+    }
+
+    const wanted = Math.max(1, Math.min(Math.round(count), MAX_POUR));
+    const origin = this.viewport.controls.target;
+    const position = new Vector3();
+    const tilt = new Quaternion();
+
+    for (let i = 0; i < wanted; i += 1) {
+      const brick = this.makeInstance(part, colorCode);
+      this.viewport.scene.add(brick.object);
+      position.set(
+        origin.x + (Math.random() - 0.5) * POUR_SPREAD,
+        FLOOR_Y + WORLD_UNIT * (0.4 + Math.random() * 0.4),
+        origin.z + (Math.random() - 0.5) * POUR_SPREAD
+      );
+      tilt.setFromAxisAngle(
+        new Vector3(
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1
+        ).normalize(),
+        Math.random() * Math.PI
+      );
+      world.spawn(brick, { position, quaternion: tilt });
+      this.loose.add(brick.id);
+    }
+    this.saveDirty = true;
+    this.report();
+  }
+
+  // -------------------------------------------------------------- carrying
+
+  rotate(yawSteps: number, tipSteps: number): void {
+    const { carried } = this;
+    if (!carried) {
+      return;
+    }
+    carried.yaw = (carried.yaw + yawSteps + 4) % 4;
+    carried.tip = (carried.tip + tipSteps + 4) % 4;
+    this.report();
+  }
+
+  /** Shift the snapped pose by whole grid steps, for the placements a grid misses. */
+  nudge(x: number, y: number, z: number): void {
+    const { carried } = this;
+    if (!carried) {
+      return;
+    }
+    carried.nudge.x += x;
+    carried.nudge.y += y;
+    carried.nudge.z += z;
+    this.report();
+  }
+
+  /** Put the carried brick down where the grid says, if it fits. */
+  place(): void {
+    const { carried } = this;
+    if (!(carried && this.world)) {
+      return;
+    }
+    // Snap once more from the pointer as it is now, so a part lands where the
+    // click was rather than wherever the easing had reached.
+    this.resolveSnap(carried);
+    if (carried.blocked) {
+      return;
+    }
+
+    const { brick } = carried;
+    const position = this.snapped.clone();
+    brick.object.position.copy(position);
+    brick.object.quaternion.copy(this.quaternion);
+
+    const placement: Placement = {
+      colorCode: brick.colorCode,
+      file: brick.partFile,
+      id: brick.id,
+      position,
+      tip: carried.tip,
+      yaw: carried.yaw,
+    };
+    this.placements.set(brick.id, placement);
+    this.placedBoxes.set(brick.id, this.boxOf(carried, position));
+    this.world.addStatic(brick);
+    this.carried = null;
+
+    // Putting one down usually means putting another down, so the same part
+    // comes straight back out rather than making you go and fetch it.
+    if (carried.from === "inventory" && this.armed) {
+      this.takeOut(this.armed.file, this.armed.colorCode);
+    }
+    this.saveDirty = true;
+    this.report();
+  }
+
+  /** Stop carrying: back to the floor if it came from there, gone if it did not. */
+  cancelCarry(): void {
+    const { carried } = this;
+    if (!carried) {
+      return;
+    }
+    this.carried = null;
+
+    if (carried.from === "inventory") {
+      this.destroy(carried.brick.id);
+    } else {
+      this.dropLoose(carried.brick);
+    }
+    this.report();
+  }
+
+  /** Throw away whatever is in hand. */
+  deleteCarried(): void {
+    const { carried } = this;
+    if (!carried) {
+      return;
+    }
+    this.carried = null;
+    this.destroy(carried.brick.id);
+    this.saveDirty = true;
+    this.report();
+  }
+
+  // ------------------------------------------------------------------ bulk
+
+  /** Sweep the floor: everything loose goes back in the box. */
+  clearLoose(): void {
+    for (const id of [...this.loose]) {
+      this.destroy(id);
+    }
+    this.saveDirty = true;
+    this.report();
+  }
+
+  /** Start again with an empty floor. */
+  clearAll(): void {
+    this.cancelCarry();
+    for (const id of [...this.placements.keys()]) {
+      this.destroy(id);
+    }
+    this.clearLoose();
+    this.saveDirty = true;
+    this.report(true);
+  }
+
+  /** The build, as a file a person can open in any LDraw tool. */
+  toLdraw(title: string): string {
+    return toLdrawFile([...this.placements.values()], title);
+  }
+
+  frame(): void {
+    const box = new Box3();
+    for (const placed of this.placedBoxes.values()) {
+      box.union(placed);
+    }
+    if (box.isEmpty()) {
+      // An empty floor still needs a sensible amount of it on screen: about
+      // twenty studs across, which is a baseplate's worth of somewhere to
+      // start rather than a close-up of nothing.
+      box.set(
+        new Vector3(-DEFAULT_VIEW, FLOOR_Y, -DEFAULT_VIEW),
+        new Vector3(DEFAULT_VIEW, FLOOR_Y + STUD * 4, DEFAULT_VIEW)
+      );
+    } else {
+      // Leave room around what is already built, so there is floor to build on
+      // rather than the build filling the frame edge to edge.
+      box.expandByScalar(STUD * 4);
+    }
+    this.viewport.frameBox(box);
+  }
+
+  // --------------------------------------------------------------- running
+
+  start(): void {
+    this.loop.start();
+  }
+
+  stop(): void {
+    this.loop.stop();
+  }
+
+  resize(width: number, height: number): void {
+    this.viewport.resize(width, height);
+  }
+
+  private tick(dt: number): void {
+    const { world } = this;
+    if (world) {
+      this.updateCarried(dt);
+      world.step(dt);
+      world.sync(this.instances as Brick[]);
+    }
+    this.viewport.updateNavigation(dt);
+    this.viewport.render();
+
+    if (
+      // biome-ignore lint/suspicious/noUnnecessaryConditions: set true on every change; Biome infers the literal false from the initialiser
+      this.saveDirty &&
+      performance.now() - this.lastSaveAt > SAVE_INTERVAL_MS
+    ) {
+      this.save();
+    }
+  }
+
+  /**
+   * Move whatever is in hand to where the pointer says, via the grid.
+   *
+   * The ray is cast at the build itself rather than at a plane, so pointing at
+   * the top of a tower means building on the top of the tower. The grid then
+   * decides the rest: where the studs are, and what the part is standing on.
+   */
+  private updateCarried(dt: number): void {
+    const { carried } = this;
+    if (!carried) {
+      return;
+    }
+    this.resolveSnap(carried);
+
+    const { object } = carried.brick;
+    // Eased rather than teleported: at grid resolution a jump of a whole stud
+    // is a jump, and following it is what tells you the snap happened. Only the
+    // drawing is eased; the pose that gets recorded is the exact one.
+    const blend = 1 - Math.exp(-CARRY_LAMBDA * dt);
+    object.position.lerp(this.snapped, blend);
+    object.quaternion.slerp(this.quaternion, blend);
+  }
+
+  /**
+   * Work out exactly where the carried part would go.
+   *
+   * Kept apart from the easing above because the two want different answers.
+   * What is drawn should slide into place; what is written down has to be on
+   * the grid to the unit, or an exported model is 158.13 studs from the origin
+   * and lines up with nothing.
+   */
+  private resolveSnap(carried: Carried): void {
+    this.poseOf(carried);
+
+    if (!this.pointerTarget(this.desired)) {
+      return;
+    }
+    const result = snapPlacement(
+      {
+        built: this.placedBoxes,
+        center: this.center,
+        desired: this.desired,
+        floorY: FLOOR_Y,
+        half: this.halfExtents,
+        nudge: carried.nudge,
+      },
+      this.snapped
+    );
+    carried.blocked = result.blocked;
+  }
+
+  /** Where the pointer meets the build, or the floor if it meets nothing. */
+  private pointerTarget(target: Vector3): boolean {
+    this.raycaster.setFromCamera(this.pointer, this.viewport.camera);
+    this.ray.copy(this.raycaster.ray);
+
+    const meshes: Mesh[] = [];
+    for (const id of this.placements.keys()) {
+      const brick = this.instances[id];
+      if (brick) {
+        meshes.push(...brick.meshes);
+      }
+    }
+    const [hit] = this.raycaster.intersectObjects(meshes, false);
+    if (hit) {
+      target.copy(hit.point);
+      return true;
+    }
+    return this.ray.intersectPlane(this.groundPlane, target) !== null;
+  }
+
+  // ---------------------------------------------------------------- pointer
+
+  private readonly handlePointerMove = (event: PointerEvent): void => {
+    const rect = this.canvas.getBoundingClientRect();
+    this.pointer.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1
+    );
+  };
+
+  /**
+   * A press is either putting down what is in hand, or picking something up.
+   *
+   * Capturing on the window is what lets a press on a brick avoid starting an
+   * orbit: OrbitControls is bound to the canvas and would otherwise see the
+   * event first. See the same trick in SceneController.
+   */
+  private readonly handlePointerDown = (event: PointerEvent): void => {
+    if (event.button !== 0 || event.target !== this.canvas || !this.ready) {
+      return;
+    }
+    this.handlePointerMove(event);
+
+    if (this.carried) {
+      if (!this.carried.blocked) {
+        event.stopPropagation();
+        event.preventDefault();
+        this.place();
+      }
+      return;
+    }
+
+    const hit = this.pick();
+    if (hit === null) {
+      return;
+    }
+    event.stopPropagation();
+    event.preventDefault();
+    this.pickUp(hit);
+  };
+
+  private pick(): number | null {
+    this.raycaster.setFromCamera(this.pointer, this.viewport.camera);
+    const meshes: Mesh[] = [];
+    for (const brick of this.instances) {
+      if (brick?.object.parent) {
+        meshes.push(...brick.meshes);
+      }
+    }
+    for (const hit of this.raycaster.intersectObjects(meshes, false)) {
+      const id = hit.object.userData?.brickId;
+      if (typeof id === "number") {
+        return id;
+      }
+    }
+    return null;
+  }
+
+  /** Take a brick back off the build, or out of the pile, and carry it. */
+  private pickUp(id: number): void {
+    const brick = this.instances[id];
+    const part = brick
+      ? this.palette?.byFile.get(brick.partFile.toLowerCase())
+      : undefined;
+    if (!(brick && part && this.world)) {
+      return;
+    }
+
+    const placement = this.placements.get(id);
+    if (placement) {
+      this.placements.delete(id);
+      this.placedBoxes.delete(id);
+      this.world.removeStatic(id);
+    } else {
+      this.world.despawn(id);
+      this.loose.delete(id);
+    }
+
+    this.carried = {
+      blocked: false,
+      brick,
+      from: placement ? "placed" : "loose",
+      nudge: { x: 0, y: 0, z: 0 },
+      part,
+      tip: placement?.tip ?? 0,
+      yaw: placement?.yaw ?? 0,
+    };
+    this.snapped.copy(brick.object.position);
+    this.saveDirty = true;
+    this.report();
+  }
+
+  // ----------------------------------------------------------- bookkeeping
+
+  private makeInstance(part: PalettePart, colorCode: number): Brick {
+    const id = this.nextId;
+    this.nextId += 1;
+    const { palette } = this;
+    if (!palette) {
+      throw new Error("no palette");
+    }
+    const brick = instantiate(part, colorCode, id, palette);
+    for (const mesh of brick.meshes) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    }
+    this.instances[id] = brick;
+    return brick;
+  }
+
+  private recolourCarried(colorCode: number): void {
+    const { carried } = this;
+    const { palette } = this;
+    if (!(carried && palette)) {
+      return;
+    }
+    const replacement = this.makeInstance(carried.part, colorCode);
+    this.viewport.scene.add(replacement.object);
+    replacement.object.position.copy(carried.brick.object.position);
+    replacement.object.quaternion.copy(carried.brick.object.quaternion);
+    this.destroy(carried.brick.id);
+    carried.brick = replacement;
+  }
+
+  private dropLoose(brick: Brick): void {
+    if (!this.world) {
+      return;
+    }
+    this.world.spawn(brick, {
+      position: brick.object.position,
+      quaternion: brick.object.quaternion,
+    });
+    this.loose.add(brick.id);
+  }
+
+  private destroy(id: number): void {
+    const brick = this.instances[id];
+    if (!brick) {
+      return;
+    }
+    this.world?.despawn(id);
+    this.world?.removeStatic(id);
+    brick.object.removeFromParent();
+    this.placements.delete(id);
+    this.placedBoxes.delete(id);
+    this.loose.delete(id);
+    this.instances[id] = undefined;
+  }
+
+  /**
+   * Load the scratch vectors with the pose a carried part currently has: its
+   * orientation, and the box that orientation gives it.
+   */
+  private poseOf(carried: Carried): void {
+    orientation(carried.yaw, carried.tip, this.quaternion);
+    rotatedHalfExtents(
+      carried.part.halfExtents,
+      this.quaternion,
+      this.halfExtents
+    );
+    rotatedCenter(carried.part.localCenter, this.quaternion, this.center);
+  }
+
+  private boxOf(carried: Carried, position: Vector3): Box3 {
+    this.poseOf(carried);
+    return boxFor(position, this.halfExtents, this.center, new Box3()).clone();
+  }
+
+  private report(force = false): void {
+    const report = this.callbacks.onProgress;
+    if (!report) {
+      return;
+    }
+    const { carried } = this;
+    const progress: FreeProgress = {
+      carrying: carried
+        ? {
+            blocked: carried.blocked,
+            colorCode: carried.brick.colorCode,
+            file: carried.brick.partFile,
+            name: carried.part.name,
+            nudge: { ...carried.nudge },
+            tip: carried.tip,
+            yaw: carried.yaw,
+          }
+        : null,
+      loose: this.loose.size,
+      placed: this.placements.size,
+      problem: this.problem,
+      ready: this.ready,
+    };
+    const signature = `${progress.placed}:${progress.loose}:${progress.ready}:${progress.problem}:${carried?.brick.id ?? -1}:${carried?.yaw}:${carried?.tip}:${carried?.blocked}:${carried?.nudge.x},${carried?.nudge.y},${carried?.nudge.z}`;
+    if (!force && signature === this.lastReport) {
+      return;
+    }
+    this.lastReport = signature;
+    report(progress);
+  }
+
+  // ------------------------------------------------------------------ save
+
+  private save(): void {
+    this.saveDirty = false;
+    if (!this.world) {
+      return;
+    }
+    this.lastSaveAt = performance.now();
+    writeFreeBuild({
+      loose: this.world.snapshot(),
+      looseParts: [...this.loose].map((id) => ({
+        colorCode: this.instances[id]?.colorCode ?? 0,
+        file: this.instances[id]?.partFile ?? "",
+        id,
+      })),
+      placed: [...this.placements.values()].map((placement) => ({
+        c: placement.colorCode,
+        f: placement.file,
+        p: [placement.position.x, placement.position.y, placement.position.z],
+        t: placement.tip,
+        y: placement.yaw,
+      })),
+      updatedAt: Date.now(),
+      v: 1,
+    });
+  }
+
+  private restore(): void {
+    const save = readFreeBuild();
+    const { palette } = this;
+    if (!(save && palette && this.world)) {
+      return;
+    }
+
+    for (const entry of save.placed) {
+      const part = palette.byFile.get(entry.f.toLowerCase());
+      if (!part) {
+        continue;
+      }
+      const brick = this.makeInstance(part, entry.c);
+      this.viewport.scene.add(brick.object);
+      const position = new Vector3(entry.p[0], entry.p[1], entry.p[2]);
+      orientation(entry.y, entry.t, this.quaternion);
+      brick.object.position.copy(position);
+      brick.object.quaternion.copy(this.quaternion);
+
+      const placement: Placement = {
+        colorCode: entry.c,
+        file: entry.f,
+        id: brick.id,
+        position,
+        tip: entry.t,
+        yaw: entry.y,
+      };
+      this.placements.set(brick.id, placement);
+      rotatedHalfExtents(part.halfExtents, this.quaternion, this.halfExtents);
+      rotatedCenter(part.localCenter, this.quaternion, this.center);
+      this.placedBoxes.set(
+        brick.id,
+        boxFor(position, this.halfExtents, this.center, new Box3()).clone()
+      );
+      this.world.addStatic(brick);
+    }
+
+    // The pile is restored by part, then by pose, because ids do not survive a
+    // reload: a saved instance is only ever "one of these, lying there".
+    const poses = new Map<number, number[]>();
+    for (let i = 0; i + 7 < save.loose.length; i += 8) {
+      poses.set(save.loose[i], save.loose.slice(i + 1, i + 8));
+    }
+    const position = new Vector3();
+    const quaternion = new Quaternion();
+    for (const entry of save.looseParts) {
+      const part = palette.byFile.get(entry.file.toLowerCase());
+      const pose = poses.get(entry.id);
+      if (!(part && pose)) {
+        continue;
+      }
+      const brick = this.makeInstance(part, entry.colorCode);
+      this.viewport.scene.add(brick.object);
+      position.set(pose[0], pose[1], pose[2]);
+      quaternion.set(pose[3], pose[4], pose[5], pose[6]);
+      this.world.spawn(brick, { position, quaternion });
+      this.loose.add(brick.id);
+    }
+  }
+
+  private readonly handlePageHide = (): void => {
+    if (this.world) {
+      this.save();
+    }
+  };
+
+  dispose(): void {
+    this.loop.dispose();
+    this.save();
+    this.canvas.removeEventListener("pointermove", this.handlePointerMove);
+    window.removeEventListener("pointerdown", this.handlePointerDown, true);
+    window.removeEventListener("pagehide", this.handlePageHide);
+    document.removeEventListener("visibilitychange", this.handlePageHide);
+    this.world?.dispose();
+    this.world = null;
+    this.viewport.dispose();
+  }
+}

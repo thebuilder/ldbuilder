@@ -1,3 +1,5 @@
+import { readJson, removeKey, round, storage, writeRaw } from "./localStore";
+
 /**
  * Saved build progress, in localStorage.
  *
@@ -44,20 +46,6 @@ interface BuildSummary {
   updatedAt: number;
 }
 
-function storage(): Storage | null {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    // Access itself throws when cookies are blocked entirely.
-    return null;
-  }
-}
-
-function round(value: number, places: number): number {
-  const factor = 10 ** places;
-  return Math.round(value * factor) / factor;
-}
-
 function isSave(value: unknown): value is BuildSave {
   if (typeof value !== "object" || value === null) {
     return false;
@@ -73,20 +61,7 @@ function isSave(value: unknown): value is BuildSave {
 }
 
 export function readBuild(slug: string): BuildSave | null {
-  const store = storage();
-  if (!store) {
-    return null;
-  }
-  try {
-    const raw = store.getItem(PREFIX + slug);
-    if (!raw) {
-      return null;
-    }
-    const parsed: unknown = JSON.parse(raw);
-    return isSave(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  return readJson(PREFIX + slug, isSave);
 }
 
 /**
@@ -103,11 +78,6 @@ export function matchesModel(
 }
 
 export function writeBuild(save: BuildSave): void {
-  const store = storage();
-  if (!store) {
-    return;
-  }
-
   const compact: BuildSave = {
     ...save,
     loose: save.loose.map((value, index) =>
@@ -119,21 +89,19 @@ export function writeBuild(save: BuildSave): void {
   };
 
   const key = PREFIX + save.slug;
-  const json = JSON.stringify(compact);
-
-  if (tryWrite(store, key, json)) {
+  if (writeRaw(key, JSON.stringify(compact))) {
     return;
   }
 
   // Out of room. The pile is the big half of the file and the least important,
   // so drop it before dropping the build.
   const lean = JSON.stringify({ ...compact, loose: [] });
-  if (tryWrite(store, key, lean)) {
+  if (writeRaw(key, lean)) {
     return;
   }
 
-  evictOldest(store, 1);
-  tryWrite(store, key, lean);
+  evictOldest(1);
+  writeRaw(key, lean);
 }
 
 function roundField(value: number, field: number): number {
@@ -143,25 +111,8 @@ function roundField(value: number, field: number): number {
   return round(value, field <= 3 ? POSITION_DP : ROTATION_DP);
 }
 
-function tryWrite(store: Storage, key: string, json: string): boolean {
-  try {
-    store.setItem(key, json);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function clearBuild(slug: string): void {
-  const store = storage();
-  if (!store) {
-    return;
-  }
-  try {
-    store.removeItem(PREFIX + slug);
-  } catch {
-    // Nothing to do: the save simply stays.
-  }
+  removeKey(PREFIX + slug);
 }
 
 /** Every saved build, most recently touched first. */
@@ -206,16 +157,11 @@ export function pruneBuilds(): void {
   if (saves.length <= MAX_SAVES) {
     return;
   }
-  evictOldest(store, saves.length - MAX_SAVES);
+  evictOldest(saves.length - MAX_SAVES);
 }
 
-function evictOldest(store: Storage, count: number): void {
-  const saves = listBuilds();
-  for (const save of saves.slice(-count)) {
-    try {
-      store.removeItem(PREFIX + save.slug);
-    } catch {
-      return;
-    }
+function evictOldest(count: number): void {
+  for (const save of listBuilds().slice(-count)) {
+    removeKey(PREFIX + save.slug);
   }
 }

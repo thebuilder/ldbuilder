@@ -9,6 +9,7 @@ import {
   Vector3,
 } from "three";
 import { computeBags } from "@/ldraw/bags";
+import type { Palette, PalettePart } from "@/ldraw/palette";
 import { computeSteps } from "@/ldraw/steps";
 import type { Brick, ModelData, Pose } from "@/ldraw/types";
 
@@ -171,6 +172,65 @@ export function makeModel(spec: ModelSpec): ModelData {
       totalBricks: bricks.length,
     },
     title: spec.title ?? "Test Model",
+  };
+}
+
+export interface PaletteSpec extends BrickSpec {
+  file?: string;
+  group?: string;
+}
+
+/**
+ * A parts palette without the 1.9MB pack behind it.
+ *
+ * `loadPalette` is a fetch, an LDraw parse and a flatten; none of that is what
+ * free build's own logic is made of, and all of it would have to be stubbed to
+ * get at the part records on the other side. So the records are built here
+ * directly, in the same shape the real loader produces.
+ */
+export function makePalette(specs: PaletteSpec[]): Palette {
+  const byFile = new Map<string, PalettePart>();
+  const parts: PalettePart[] = [];
+
+  for (const [index, spec] of specs.entries()) {
+    const [studsX, studsZ] = spec.size ?? [1, 1];
+    const width = studsX * STUD;
+    const depth = studsZ * STUD;
+
+    // A palette template is raw LDraw geometry: unposed, and still in the frame
+    // where Y points down. A part's origin is its stud face, so its body hangs
+    // below the origin in those coordinates, which is above it once stood up.
+    const geometry = new BoxGeometry(width, BRICK_HEIGHT, depth);
+    geometry.translate(0, BRICK_HEIGHT / 2, 0);
+    geometry.computeBoundingBox();
+
+    const template = new Object3D();
+    const mesh = new Mesh(geometry, materialFor(spec.colorCode ?? 16));
+    template.add(mesh);
+    template.updateMatrixWorld(true);
+
+    const part: PalettePart = {
+      file: spec.file ?? `${3000 + index}.dat`,
+      group: spec.group ?? "brick",
+      halfExtents: new Vector3(width / 2, BRICK_HEIGHT / 2, depth / 2),
+      localCenter: new Vector3(0, BRICK_HEIGHT / 2, 0),
+      meshes: [mesh],
+      name: spec.partFile ?? `Part ${index}`,
+      radius: Math.hypot(width, BRICK_HEIGHT, depth) / 2,
+      size: spec.size ?? [1, 1],
+      template,
+    };
+    byFile.set(part.file.toLowerCase(), part);
+    parts.push(part);
+  }
+
+  return {
+    byFile,
+    groups: [{ id: "brick", label: "Bricks", parts }],
+    materials: (code: number) => ({
+      edge: materialFor(code + 10_000),
+      surface: materialFor(code),
+    }),
   };
 }
 
