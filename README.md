@@ -4,12 +4,19 @@ Load an LDraw model, tip the bricks onto the floor, and watch it assemble itself
 one build step at a time. Explode the finished model, slice it open layer by
 layer, isolate a submodel, or click any single brick to find out what it is.
 
+Or build it yourself. In **build mode** the bag lands as a live physics pile you
+can dig through, shove and throw pieces out of; each step lights up the slots it
+needs, and a piece dropped near the right one clicks into place. Progress is
+saved in the browser, so a set with eight hundred steps in it can be picked up
+where you left off.
+
 Next.js 16 + three.js. No accounts, no server-side rendering of anything heavy,
 no parts library needed to run it.
 
 ```bash
 pnpm install
 pnpm dev
+pnpm test
 ```
 
 That works straight from a checkout: the bundled models are committed as
@@ -256,6 +263,24 @@ from both the gallery and the builder's initial HTML and only downloads once a
 model is opened, alongside the model itself. Switching to the non-compat build
 would serve the wasm as its own cacheable file and drop the base64 overhead.
 
+**Tests.** `pnpm test` runs vitest over the half of the app that is not a
+renderer: the build state machine, the saved-game store, the live physics world,
+the slot ghosts, and the scene-graph bookkeeping. three.js and rapier both work
+headless as long as nothing asks for a `WebGLRenderer`, so the physics tests run
+the real solver rather than a stand-in, and the scene controller is exercised in
+jsdom against a renderer stub that draws nothing. What is left to the eye is the
+part that genuinely needs a GPU.
+
+Two bugs in this repo were found by writing those tests rather than by using the
+app. A brick carried above its slot could sit outside its own snap radius, which
+made small, tall parts the hardest thing in a model to place; and build mode fell
+back to the watch scrubber for the frame before the first progress report, which
+handed over a control that skips the whole point of the mode.
+
+`pnpm test:coverage` writes `coverage/coverage-final.json`, which `fallow audit`
+reads to score complexity. Without it every function is assumed untested and
+CRAP collapses into a second, much stricter cyclomatic threshold.
+
 **Performance.** Two thresholds, both measured rather than guessed.
 
 - Above 800 bricks, vertex normals stay flat. Smoothing dominates the parse:
@@ -267,8 +292,47 @@ would serve the wasm as its own cacheable file and drop the base64 overhead.
 Merging completed bags with `LDrawUtils.mergeObject` is the next thing to try,
 since a finished bag never needs per-brick identity again. Not built yet.
 
+**Build mode.** The watch flow bakes its pour and plays the recording back,
+which works precisely because nothing in it is interactive. Build mode cannot:
+the pile is whatever you have done to it, so `src/scene/liveWorld.ts` runs the
+solver every frame. The cost is bounded by the same thing that bounds the pour,
+since only one bag is ever loose, so the body count tops out around 170; a
+settled pile sleeps, and the placed model is static colliders with no bodies at
+all. Measured at 120 fps on a 368-brick set with 68 bricks on the floor.
+
+A held brick is kinematic rather than dynamic. It shoves the pile out of the way
+and never gets shoved, which is the difference between digging a brick out of a
+heap and fighting a spring for it. Letting go hands the tracked hand velocity
+back to a dynamic body, so a flick throws.
+
+Slots are matched by **part, not identity**. A bag holds eight identical 1x2
+plates and insisting on one particular plate would be a puzzle about nothing, so
+any brick with the same part and colour fills the slot. What makes that
+invisible is that placing swaps the two records' objects and bodies: identical
+part and colour means identical geometry and materials, so nothing on screen
+changes, and afterwards every record still owns exactly one brick.
+
+Two smaller things worth knowing. A carried brick rides a horizontal plane at
+the height of the slots being filled, not a camera-facing one, so dragging moves
+it across the table rather than lofting it into the sky; the wheel raises and
+lowers it, since orbiting is suspended while you are holding something. And two
+presses on the same brick send it home by itself, because aiming in three
+dimensions with a two-dimensional pointer is the one thing that can make the
+mode unplayable on a trackpad.
+
+**Saved builds.** `localStorage`, one entry per model, holding the step, the
+filled slots, and where the loose bricks are lying. The first two are a couple
+of hundred bytes. The third is the expensive one and it is kept anyway, because
+a pile you have already sorted through is most of the work: re-pouring would
+hand back a tidy heap you have never seen. Every read is defensive and every
+write may fail, so a full or disabled store drops the pile first and the build
+second. A save is checked against the model's brick and step counts, so
+repacking a model invalidates it rather than corrupting it.
+
 **State.** Anything you would want to share or keep across a refresh lives in
-the URL via nuqs: `?step=`, `?mode=`, `?explode=`, `?slice=`, `?sub=`, `?sel=`.
+the URL via nuqs: `?flow=`, `?step=`, `?mode=`, `?explode=`, `?slice=`, `?sub=`,
+`?sel=`. Build progress is the exception: it is far too big for a URL and is
+meaningless to anyone else, so it lives in `localStorage` instead.
 `step` counts steps already finished, so `0` is an untouched pile and a value
 equal to the step count is a finished model.
 Per-frame playback state stays in the scene controller and never round-trips
@@ -288,6 +352,16 @@ of going through react-three-fiber.
 | `[` `]` or `,` `.` | Step backwards or forwards |
 | Escape | Clear the selection |
 | Frame | Toggle between framing the table and framing the model |
+
+In build mode:
+
+| | |
+| --- | --- |
+| Drag a brick | Pick it up and carry it |
+| Scroll while carrying | Raise or lower it |
+| Flick and release | Throw it |
+| Press a brick twice | Send it to its slot |
+| F | Highlight the pieces this step still needs |
 
 The full list lives behind the `?` in the View panel. Movement pans the camera
 and its orbit target together, so it is not walking: wherever you stop, dragging
@@ -344,11 +418,12 @@ lighter, because lighter drops white text below 4.5:1.
 
 ```
 scripts/           setup, packing and demo generation (plain ESM, shared with /api/pack)
+src/test/          fixtures and stubs shared by the unit tests
 public/models/     committed self-contained .mpd files + manifest
 public/ldraw/      LDConfig.ldr, the colour table
 demo-models/       source for the generated demos
 src/ldraw/         loading, flattening, steps, bags, floor layout
-src/scene/         renderer, assembly state machine, materials, easing
+src/scene/         renderer, assembly state machine, live physics, build rules
 src/components/    viewer stage and HUD panels
 ```
 

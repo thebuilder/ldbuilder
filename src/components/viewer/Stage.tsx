@@ -9,6 +9,8 @@ import {
 } from "@/scene/SceneController";
 
 export interface StageProps {
+  /** Increment to throw the saved build away and start it again. */
+  buildReset: number;
   callbacks: SceneCallbacks;
   className?: string;
   /** Hover driven from the parts list rather than the pointer. */
@@ -25,6 +27,7 @@ export function Stage({
   callbacks,
   externalHover,
   frameNonce,
+  buildReset,
   className = "",
 }: StageProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -45,6 +48,8 @@ export function Stage({
     const controller = new SceneController(canvas);
     controllerRef.current = controller;
     controller.setCallbacks({
+      onBuildProgress: (progress) =>
+        callbacksRef.current.onBuildProgress?.(progress),
       onFinished: () => callbacksRef.current.onFinished?.(),
       onHover: (id) => callbacksRef.current.onHover?.(id),
       onSelect: (id) => callbacksRef.current.onSelect?.(id),
@@ -87,6 +92,12 @@ export function Stage({
       controllerRef.current?.frameModel(true);
     }
   }, [frameNonce]);
+
+  useEffect(() => {
+    if (buildReset > 0) {
+      controllerRef.current?.resetBuild();
+    }
+  }, [buildReset]);
 
   return (
     <div className={className}>

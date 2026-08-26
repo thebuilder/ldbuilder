@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DropZone } from "@/components/DropZone";
 import { OpenSetCard } from "@/components/OpenSetCard";
+import { ResumeBadge } from "@/components/ResumeBadge";
 import { LegalFooter } from "@/components/shell/LegalFooter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getManifest } from "@/lib/manifest";
@@ -26,13 +27,16 @@ export default async function GalleryPage() {
 
           <p className="max-w-2xl text-2xl text-ink leading-snug">
             Tip the bricks onto the floor and watch a model assemble itself, one
-            build step at a time.
+            build step at a time. Or tip them out and build it yourself.
           </p>
           <p className="max-w-2xl text-muted text-sm leading-relaxed">
             Every model is an LDraw file rendered with three.js. Follow the
             authored build order, explode the finished model to see how it fits
             together, slice it open layer by layer, or click any single brick to
-            find out what it is.
+            find out what it is. In build mode the pile is a live physics
+            simulation: dig through it, throw pieces aside, and drop each one
+            into its slot. Progress is kept in this browser, so a long set can
+            be picked up where you left it.
           </p>
         </div>
       </header>
@@ -47,7 +51,7 @@ export default async function GalleryPage() {
 
         <ul className="grid gap-px sm:grid-cols-2 lg:grid-cols-3">
           {models.map((model) => (
-            <li key={model.slug}>
+            <li className="relative" key={model.slug}>
               <Link
                 className="group flex h-full flex-col justify-between gap-6 bg-panel p-5 shadow-[0_0_0_1px_var(--color-edge)] transition-colors hover:bg-panel-raised"
                 href={`/build/${model.slug}`}
@@ -69,9 +73,12 @@ export default async function GalleryPage() {
                     <Stat label="Steps" value={model.steps} />
                     <Stat label="Unique" value={model.uniqueParts} />
                   </dl>
-                  <p className="readout mt-3 text-faint">{model.credit}</p>
+                  <p className="readout mt-3 max-w-[70%] text-faint">
+                    {model.credit}
+                  </p>
                 </div>
               </Link>
+              <ResumeBadge slug={model.slug} steps={model.steps} />
             </li>
           ))}
 
