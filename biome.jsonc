@@ -21,6 +21,21 @@
       }
     }
   },
+  // Test files are not a hot path, and a rule about recompiling regular
+  // expressions in one is describing a cost that does not exist. Assertions read
+  // better with the pattern at the point it is asserted.
+  "overrides": [
+    {
+      "includes": ["**/*.test.ts", "**/*.test.tsx", "src/test/**"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "useTopLevelRegex": "off"
+          }
+        }
+      }
+    }
+  ],
   "files": {
     "includes": [
       "!src/ldraw/colors.generated.ts",

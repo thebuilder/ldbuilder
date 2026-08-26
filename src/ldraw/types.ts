@@ -116,7 +116,33 @@ export interface ModelData {
   title: string;
 }
 
-export type ViewMode = "build" | "explode" | "slice";
+export type ViewMode = "assemble" | "explode" | "slice";
+
+/**
+ * The two flows.
+ *
+ * `watch` plays the model out step by step. `build` drops the bag on the floor
+ * and makes you find the pieces and put them in yourself.
+ */
+export type SessionMode = "build" | "watch";
+
+/** What build mode reports back for the HUD. Derived state, recomputed on change. */
+export interface BuildProgress {
+  bag: number;
+  done: boolean;
+  /** Bricks still loose on the floor for the open bag. */
+  loose: number;
+  /** Slots of the current step still to fill, so the HUD can name the parts. */
+  pending: number[];
+  placedTotal: number;
+  /** True when the session picked a saved build up rather than starting fresh. */
+  resumed: boolean;
+  step: number;
+  totalBags: number;
+  totalSteps: number;
+  /** Set when build mode could not start at all, e.g. physics failed to load. */
+  unavailable: boolean;
+}
 
 export interface LoadProgress {
   detail?: string;
