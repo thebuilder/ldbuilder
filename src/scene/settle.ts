@@ -1,6 +1,13 @@
 import { Quaternion, Vector3 } from "three";
 import type { BagInfo, Brick } from "@/ldraw/types";
 import { hashString, makeRandom } from "@/lib/random";
+import {
+  BRICK_DENSITY,
+  BRICK_FRICTION,
+  BRICK_RESTITUTION,
+  getPhysics,
+  gravityFor,
+} from "./physics";
 
 /**
  * Rigid-body simulation of a bag being tipped onto the floor.
@@ -18,49 +25,11 @@ import { hashString, makeRandom } from "@/lib/random";
  * screen. Recording is roughly 500KB per bag, and only the open bag is kept.
  */
 
-type Rapier = typeof import("@dimforge/rapier3d-compat");
-
-let rapier: Rapier | null = null;
-let loading: Promise<Rapier | null> | null = null;
-
-/**
- * Load the physics engine. It is a WebAssembly module of some size, so it is
- * imported on demand rather than bundled into the entry chunk. A failure here
- * is not fatal: the caller falls back to a scripted drop.
- */
-export function loadPhysics(): Promise<Rapier | null> {
-  loading ??= import("@dimforge/rapier3d-compat")
-    .then(async (module) => {
-      await module.init();
-      rapier = module;
-      return module;
-    })
-    .catch((error) => {
-      console.warn(
-        "[ldraw] physics unavailable, falling back to a scripted drop",
-        error
-      );
-      return null;
-    });
-  return loading;
-}
-
 /** Floats per brick per frame: position (3) plus quaternion (4). */
 const STRIDE = 7;
 
 const STEP_HZ = 60;
 const MAX_STEPS = 180;
-
-/**
- * Seconds a brick takes to fall from the base release height, which is what
- * gravity is derived from.
- *
- * There is a floor on how short this can be. A fall compressed into a dozen
- * frames arrives before the speed has visibly changed, so it reads as constant
- * velocity even though the solver is accelerating it correctly. Around half a
- * second of played-back fall is what it takes to actually see the acceleration.
- */
-const FALL_SECONDS = 0.72;
 
 export interface SettleRecording {
   /** frames x bricks x STRIDE, in bag order. */
@@ -87,7 +56,7 @@ export function simulateBag(
   dropHeight: number,
   seed: string
 ): SettleRecording | null {
-  const RAPIER = rapier;
+  const RAPIER = getPhysics();
   if (!RAPIER) {
     console.warn("[ldraw] settle: physics module not ready");
     return null;
@@ -109,11 +78,7 @@ export function simulateBag(
 
   const random = makeRandom(hashString(`${seed}:settle${bag.index}`));
 
-  // Gravity is derived from the drop height so a brick takes the same time to
-  // fall whatever the model's scale. LDraw units are 0.4mm, so real gravity
-  // would be about 24,500 units per second squared and the drop would be over
-  // before anyone saw it.
-  const gravity = (2 * dropHeight) / (FALL_SECONDS * FALL_SECONDS);
+  const gravity = gravityFor(dropHeight);
 
   const world = new RAPIER.World({ x: 0, y: -gravity, z: 0 });
   world.timestep = 1 / STEP_HZ;
@@ -128,7 +93,7 @@ export function simulateBag(
   world.createCollider(
     RAPIER.ColliderDesc.cuboid(dropHeight * 8, groundThickness, dropHeight * 8)
       .setTranslation(0, floorY - groundThickness, 0)
-      .setRestitution(0.05)
+      .setRestitution(BRICK_RESTITUTION)
       .setFriction(1.2)
   );
 
@@ -188,11 +153,9 @@ export function simulateBag(
         brick.halfExtents.y,
         brick.halfExtents.z
       )
-        // Barely any bounce. ABS on a table does not bounce much, and a pile
-        // that keeps skittering reads as polystyrene.
-        .setRestitution(0.05)
-        .setFriction(1.1)
-        .setDensity(0.002),
+        .setRestitution(BRICK_RESTITUTION)
+        .setFriction(BRICK_FRICTION)
+        .setDensity(BRICK_DENSITY),
       body
     );
 

@@ -7,7 +7,8 @@ import type { Brick } from "@/ldraw/types";
 export interface InspectorProps {
   brick: Brick | null;
   onClose: () => void;
-  onGoToStep: (step: number) => void;
+  /** Omitted in build mode, where the step is reached by building up to it. */
+  onGoToStep?: (step: number) => void;
   totalBags: number;
   totalSteps: number;
 }
@@ -73,15 +74,17 @@ export function Inspector({
         />
       </dl>
 
-      <div className="border-edge border-t px-3 py-2">
-        <button
-          className="hud-button w-full"
-          onClick={() => onGoToStep(brick.step)}
-          type="button"
-        >
-          Go to its step
-        </button>
-      </div>
+      {onGoToStep ? (
+        <div className="border-edge border-t px-3 py-2">
+          <button
+            className="hud-button w-full"
+            onClick={() => onGoToStep(brick.step)}
+            type="button"
+          >
+            Go to its step
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

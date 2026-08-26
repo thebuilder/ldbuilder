@@ -146,3 +146,53 @@ export function Close({ className = "h-3.5 w-3.5" }: IconProps) {
     </Glyph>
   );
 }
+
+/** Build mode: a brick being set down. */
+export function Brick({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <Glyph className={className}>
+      <path d="M2.5 7.5h11v5h-11z" />
+      <path d="M5 7.5v-2h2v2M9 7.5v-2h2v2" />
+    </Glyph>
+  );
+}
+
+/** Watch mode: the model playing itself out. */
+export function Eye({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <Glyph className={className}>
+      <path d="M1.5 8s2.5-4 6.5-4 6.5 4 6.5 4-2.5 4-6.5 4-6.5-4-6.5-4Z" />
+      <circle cx="8" cy="8" r="1.8" />
+    </Glyph>
+  );
+}
+
+/** Highlight the pieces this step still needs. */
+export function Target({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <Glyph className={className}>
+      <circle cx="8" cy="8" r="5.5" />
+      <circle cx="8" cy="8" r="1.8" />
+    </Glyph>
+  );
+}
+
+/** Start the build again from the first step. */
+export function Restart({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <Glyph className={className}>
+      <path d="M13 8a5 5 0 1 1-1.6-3.7" />
+      <path d="M13.2 2.6v2.8h-2.8" />
+    </Glyph>
+  );
+}
+
+/** Progress written to disk. */
+export function Save({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <Glyph className={className}>
+      <path d="M2.5 3.5h8L13.5 6v6.5h-11z" />
+      <path d="M5 3.5v3h5" />
+    </Glyph>
+  );
+}

@@ -42,6 +42,20 @@ const IMPACT_AT = 1 / 2.75;
 /** How high a brick arcs on its way from the floor into the model. */
 const ASSEMBLE_ARC_FACTOR = 0.22;
 
+/** Everything a build-mode frame needs from outside the assembly. */
+export interface BuildFrame {
+  activeBag: number;
+  /** A brick that has just gone in, flashed briefly so the placement registers. */
+  flash: number | null;
+  grabbed: number | null;
+  /** Loose bricks matching a pending slot, lit up so they can be found. */
+  hinted: number[];
+  hovered: number | null;
+  /** 1 where a slot has been filled. Indexed by brick id. */
+  placed: Uint8Array;
+  selected: number | null;
+}
+
 export interface AssemblyState {
   explode: number;
   hovered: number[];
@@ -216,6 +230,77 @@ export class Assembly {
     // what the flight into the model starts from and what the camera frames.
     applyRestingPoses(recording, this.model.bricks);
     return recording.duration;
+  }
+
+  /** Floor height in model space, which is where the physics ground sits. */
+  get floor(): number {
+    return this.floorY;
+  }
+
+  /** Release height, and the characteristic length the live world is scaled by. */
+  get dropHeight(): number {
+    return this.pourHeight;
+  }
+
+  get centre(): Vector3 {
+    return this.modelCenter;
+  }
+
+  /**
+   * Hand one brick's object to another record, and take its own back.
+   *
+   * Build mode matches slots by part rather than by identity, so the brick that
+   * gets carried into a slot is almost never the record that owns it. Swapping
+   * the two objects is what makes that invisible: identical part and colour
+   * means identical geometry and materials, so nothing on screen changes, and
+   * afterwards every record still owns exactly one object.
+   *
+   * The per-brick caches have to move with it, or styling would be applied to
+   * the wrong meshes from here on.
+   */
+  swapBrickObjects(a: number, b: number): void {
+    const first = this.model.bricks[a];
+    const second = this.model.bricks[b];
+    if (a === b || !(first && second)) {
+      return;
+    }
+
+    const { meshes, object } = first;
+    first.object = second.object;
+    first.meshes = second.meshes;
+    second.object = object;
+    second.meshes = meshes;
+
+    stampBrickId(first);
+    stampBrickId(second);
+
+    swap(this.renderables, a, b);
+    swap(this.renderState, a, b);
+    swap(this.inScene, a, b);
+  }
+
+  /**
+   * Pose and style one build-mode frame.
+   *
+   * Loose bricks are deliberately not posed here: the live world owns them, and
+   * writing over its output would be a fight the renderer wins one frame and
+   * the solver wins the next.
+   */
+  updateBuild(frame: BuildFrame): void {
+    this.setActiveBag(frame.activeBag);
+
+    for (const brick of this.model.bricks) {
+      if (!this.inScene[brick.id]) {
+        continue;
+      }
+
+      if (frame.placed[brick.id] === 1) {
+        brick.object.position.copy(brick.builtPose.position);
+        brick.object.quaternion.copy(brick.builtPose.quaternion);
+      }
+
+      this.applyState(brick, buildStateOf(brick.id, frame));
+    }
   }
 
   /** Bricks belonging to the step currently being placed, in placement order. */
@@ -465,6 +550,10 @@ export class Assembly {
       }
     }
 
+    this.applyState(brick, next);
+  }
+
+  private applyState(brick: Brick, next: RenderState | "hidden"): void {
     const visible = next !== "hidden";
     if (brick.object.visible !== visible) {
       brick.object.visible = visible;
@@ -473,7 +562,7 @@ export class Assembly {
       return;
     }
 
-    const state = next as RenderState;
+    const state = next;
     if (this.renderState[brick.id] === state) {
       return;
     }
@@ -550,6 +639,31 @@ function inSubmodel(brick: Brick, path: string): boolean {
   }
   const brickPath = brick.submodelPath.join("/");
   return brickPath === path || brickPath.startsWith(`${path}/`);
+}
+
+function buildStateOf(id: number, frame: BuildFrame): RenderState {
+  if (
+    frame.grabbed === id ||
+    frame.hovered === id ||
+    frame.selected === id ||
+    frame.flash === id ||
+    frame.hinted.includes(id)
+  ) {
+    return "highlight";
+  }
+  return "normal";
+}
+
+function stampBrickId(brick: Brick): void {
+  brick.object.traverse((child) => {
+    child.userData.brickId = brick.id;
+  });
+}
+
+function swap<T>(list: T[], a: number, b: number): void {
+  const held = list[a];
+  list[a] = list[b];
+  list[b] = held;
 }
 
 const EMPTY_IDS: number[] = [];
