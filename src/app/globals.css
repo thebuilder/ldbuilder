@@ -1,0 +1,346 @@
+@import "tailwindcss";
+
+/*
+  Graphite panels, off-white type, hairline borders.
+
+  Every colour here is checked against WCAG AA, including the worst case where a
+  panel sits over a white brick rather than over the dark ground. Panels are 92%
+  opaque, which is what makes that worst case survivable.
+
+  Colour also carries meaning, so each hue has one job:
+    accent (blue)  selection, the active mode, build progress
+    warn (yellow)  something is off but usable: inferred steps, missing parts
+    danger (red)   an outright failure
+
+  Yellow is never used for "selected". Everywhere else it means caution, and a
+  UI that says "you are here" and "something is wrong" in one colour says
+  neither. The LEGO primaries survive only in the wordmark.
+
+  The blue splits in two because one blue cannot do both jobs on a dark UI. A
+  blue light enough to read as text over graphite is too light to carry white
+  text on top of it, and a blue dark enough for white text disappears into the
+  panel when used as text.
+*/
+@theme {
+  --color-ground: #0e0f12;
+  --color-ground-deep: #08090b;
+  --color-panel: #16181d;
+  --color-panel-raised: #1c1f26;
+  --color-panel-hover: #272d38;
+  --color-edge: #2b3038;
+  --color-edge-bright: #454d5c;
+
+  /* 15.4:1 on a panel, 12.3:1 over a white brick. */
+  --color-ink: #eceef2;
+  /* 9.2:1 / 7.3:1. Secondary text. */
+  --color-muted: #b3bac6;
+  /* 5.9:1 / 4.7:1. Labels and readouts, the smallest text in the UI. */
+  --color-faint: #8d95a2;
+
+  /* Fill. White on it is 5.1:1, and it is 3.2:1 against a resting button, so an
+     active segment in a group is distinguishable from its neighbours by more
+     than the colour of its label. */
+  --color-accent: #1c6bd6;
+  /* Hover goes darker, not lighter. A lighter blue drops white text below
+     4.5:1, and darkening matches what a press looks like anyway. */
+  --color-accent-hover: #1a63c4;
+  --color-on-accent: #ffffff;
+  /* The accent made legible as text, icons and hairlines against the surface:
+     lighter than the fill on dark, darker than it on light. 8.0:1 on a panel. */
+  --color-accent-fg: #6fb2f5;
+
+  --color-warn: #f5c518;
+  --color-danger: #f2626a;
+
+  --color-brick-red: #e3000b;
+  --color-brick-blue: #0057a6;
+  --color-brick-yellow: #f5c518;
+
+  --font-mono:
+    ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica,
+    Arial, sans-serif;
+}
+
+/*
+  Read by SceneController with getComputedStyle, so the canvas and the panels
+  cannot drift apart. Kept out of @theme because nothing needs utilities for them.
+*/
+:root {
+  --scene-ground: #0e0f12;
+  --scene-grid-major: #2a2f39;
+  --scene-grid-minor: #1b1e25;
+  --scene-shadow: 0.32;
+  --scene-env: 0.85;
+}
+
+/*
+  Light theme. Same structure, same contrast bar, checked the same way. Two
+  values could not simply be reused: warn had to become a dark amber, because
+  #f5c518 on white is 1.7:1, and accent-fg had to go darker than the fill rather
+  than lighter.
+*/
+:root.light {
+  --color-ground: #f1f3f6;
+  --color-ground-deep: #e4e7ec;
+  --color-panel: #ffffff;
+  --color-panel-raised: #eff2f6;
+  --color-panel-hover: #e2e7ef;
+  --color-edge: #d5dae2;
+  --color-edge-bright: #a9b2c0;
+
+  --color-ink: #12151a;
+  --color-muted: #444b57;
+  --color-faint: #5f6874;
+
+  --color-accent: #1c6bd6;
+  --color-accent-hover: #1554a8;
+  --color-on-accent: #ffffff;
+  --color-accent-fg: #12529f;
+
+  --color-warn: #8a5a00;
+  --color-danger: #c2262e;
+
+  --scene-ground: #eef0f3;
+  --scene-grid-major: #c3cad6;
+  --scene-grid-minor: #dde2ea;
+  --scene-shadow: 0.2;
+  --scene-env: 1.05;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  html.light {
+    color-scheme: light;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    color: var(--color-ink);
+    background-color: var(--color-ground);
+  }
+
+  ::selection {
+    color: var(--color-on-accent);
+    background: var(--color-accent);
+  }
+
+  /* Thin, unobtrusive scrollbars: the panels are dense enough already. */
+  * {
+    scrollbar-color: var(--color-edge-bright) transparent;
+    scrollbar-width: thin;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent-fg);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* A HUD panel: hairline border, faint inner glow, corner ticks. */
+  .panel {
+    position: relative;
+    background: color-mix(in srgb, var(--color-panel) 92%, transparent);
+    border: 1px solid var(--color-edge);
+    backdrop-filter: blur(12px) saturate(1.1);
+  }
+
+  .panel::before,
+  .panel::after {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    pointer-events: none;
+    content: "";
+    border-color: var(--color-edge-bright);
+  }
+
+  .panel::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+
+  .panel::after {
+    right: -1px;
+    bottom: -1px;
+    border-right: 1px solid;
+    border-bottom: 1px solid;
+  }
+
+  .label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1;
+    color: var(--color-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  .readout {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+
+  /*
+    Buttons. The resting and hover states used to differ only in text and
+    border colour. On a dark panel that shift is close to invisible, so the
+    background has to move too.
+  */
+  .hud-button {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem 0.7rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: var(--color-panel-raised);
+    border: 1px solid var(--color-edge);
+    transition:
+      color 120ms ease,
+      border-color 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .hud-button:hover:not(:disabled) {
+    color: var(--color-ink);
+    background: var(--color-panel-hover);
+    border-color: var(--color-edge-bright);
+  }
+
+  .hud-button:active:not(:disabled) {
+    background: var(--color-panel-raised);
+  }
+
+  .hud-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
+
+  .hud-button[data-active="true"] {
+    color: var(--color-on-accent);
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  /* Needs to outrank the plain hover rule, which is why it repeats the state. */
+  .hud-button[data-active="true"]:hover:not(:disabled) {
+    color: var(--color-on-accent);
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+  }
+}
+
+@layer components {
+  /*
+    A popover tethered to a HUD button. Positioned from getBoundingClientRect
+    rather than CSS anchor positioning, which no major browser ships natively
+    yet and whose polyfill cannot do position-area on popovers.
+
+    The :popover-open / .\:popover-open pair matters: the polyfill cannot define
+    a real pseudo-class so it sets a class instead, and a browser that lacks the
+    pseudo-class throws out the whole rule unless they are combined with :is().
+  */
+  .hud-popover {
+    position: fixed;
+    inset: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    background: transparent;
+    border: none;
+  }
+
+  .hud-popover:is(:popover-open, .\:popover-open) {
+    display: block;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+    Range inputs drive the scrubber, explode and slice.
+
+    The thumb spans the full track height rather than being nudged into place
+    with a negative margin, and the input is a block so it has no inline
+    baseline gap. Both matter because the visible track is a separate absolutely
+    positioned element behind the input: an inline input left a 6px descender
+    gap under it, so the container was taller than the input and the thumb sat
+    3px above the line it was supposed to be riding.
+  */
+  .slider {
+    display: block;
+    width: 100%;
+    height: 16px;
+    margin: 0;
+    appearance: none;
+    cursor: pointer;
+    background: transparent;
+  }
+
+  .slider::-webkit-slider-runnable-track {
+    height: 16px;
+    background: transparent;
+  }
+
+  .slider::-moz-range-track {
+    height: 16px;
+    background: transparent;
+  }
+
+  .slider::-webkit-slider-thumb {
+    width: 9px;
+    height: 16px;
+    margin-top: 0;
+    appearance: none;
+    background: var(--color-ink);
+    border: none;
+    border-radius: 1px;
+    transition: background-color 120ms ease;
+  }
+
+  .slider::-moz-range-thumb {
+    width: 9px;
+    height: 16px;
+    background: var(--color-ink);
+    border: none;
+    border-radius: 1px;
+    transition: background-color 120ms ease;
+  }
+
+  .slider:hover::-webkit-slider-thumb,
+  .slider:focus-visible::-webkit-slider-thumb {
+    background: var(--color-accent-fg);
+  }
+
+  .slider:hover::-moz-range-thumb,
+  .slider:focus-visible::-moz-range-thumb {
+    background: var(--color-accent-fg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
