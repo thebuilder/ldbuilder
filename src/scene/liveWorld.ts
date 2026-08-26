@@ -270,6 +270,16 @@ export class LiveWorld {
     this.statics.set(brick.id, collider);
   }
 
+  /** Take a placed brick back off the model, so it can be carried again. */
+  removeStatic(brickId: number): void {
+    const collider = this.statics.get(brickId);
+    if (!collider) {
+      return;
+    }
+    this.world.removeCollider(collider, false);
+    this.statics.delete(brickId);
+  }
+
   /**
    * Take hold of a brick.
    *

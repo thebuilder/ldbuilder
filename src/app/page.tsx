@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DropZone } from "@/components/DropZone";
+import { FreeBuildCard } from "@/components/free/FreeBuildCard";
 import { OpenSetCard } from "@/components/OpenSetCard";
 import { ResumeBadge } from "@/components/ResumeBadge";
 import { LegalFooter } from "@/components/shell/LegalFooter";
@@ -82,9 +83,13 @@ export default async function GalleryPage() {
             </li>
           ))}
 
-          {/* Last cell, so opening a model and adding one are the same gesture
-              in the same place. With four bundled models it also fills the gap
-              the grid would otherwise leave. */}
+          {/* Last cells, so opening a model, adding one, and building without
+              one are the same gesture in the same place. With six bundled
+              models they also fill the gap the grid would otherwise leave. */}
+          <li>
+            <FreeBuildCard />
+          </li>
+
           <li>
             <OpenSetCard />
           </li>

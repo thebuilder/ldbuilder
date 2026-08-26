@@ -1,0 +1,1028 @@
+{
+  "groups": [
+    {
+      "id": "brick",
+      "label": "Bricks",
+      "parts": [
+        {
+          "file": "3005.dat",
+          "name": "Brick 1 x 1",
+          "size": [1, 1]
+        },
+        {
+          "file": "14716.dat",
+          "name": "Brick 1 x 1 x 3",
+          "size": [1, 1, 3]
+        },
+        {
+          "file": "3004.dat",
+          "name": "Brick 1 x 2",
+          "size": [1, 2]
+        },
+        {
+          "file": "3245a.dat",
+          "name": "Brick 1 x 2 x 2",
+          "size": [1, 2, 2]
+        },
+        {
+          "file": "3622.dat",
+          "name": "Brick 1 x 3",
+          "size": [1, 3]
+        },
+        {
+          "file": "2357.dat",
+          "name": "Brick 2 x 2 Corner",
+          "size": [2, 2]
+        },
+        {
+          "file": "3003.dat",
+          "name": "Brick 2 x 2",
+          "size": [2, 2]
+        },
+        {
+          "file": "30145.dat",
+          "name": "Brick 2 x 2 x 3",
+          "size": [2, 2, 3]
+        },
+        {
+          "file": "3010.dat",
+          "name": "Brick 1 x 4",
+          "size": [1, 4]
+        },
+        {
+          "file": "49311.dat",
+          "name": "Brick 1 x 4 x 3",
+          "size": [1, 4, 3]
+        },
+        {
+          "file": "39266.dat",
+          "name": "Brick 1 x 5 x 2",
+          "size": [1, 5, 2]
+        },
+        {
+          "file": "3002.dat",
+          "name": "Brick 2 x 3",
+          "size": [2, 3]
+        },
+        {
+          "file": "3009.dat",
+          "name": "Brick 1 x 6",
+          "size": [1, 6]
+        },
+        {
+          "file": "3754.dat",
+          "name": "Brick 1 x 6 x 5",
+          "size": [1, 6, 5]
+        },
+        {
+          "file": "3001.dat",
+          "name": "Brick 2 x 4",
+          "size": [2, 4]
+        },
+        {
+          "file": "30144.dat",
+          "name": "Brick 2 x 4 x 3",
+          "size": [2, 4, 3]
+        },
+        {
+          "file": "3008.dat",
+          "name": "Brick 1 x 8",
+          "size": [1, 8]
+        },
+        {
+          "file": "6111.dat",
+          "name": "Brick 1 x 10",
+          "size": [1, 10]
+        },
+        {
+          "file": "2456.dat",
+          "name": "Brick 2 x 6",
+          "size": [2, 6]
+        },
+        {
+          "file": "6213.dat",
+          "name": "Brick 2 x 6 x 3",
+          "size": [2, 6, 3]
+        },
+        {
+          "file": "6112.dat",
+          "name": "Brick 1 x 12",
+          "size": [1, 12]
+        },
+        {
+          "file": "702.dat",
+          "name": "Brick 4 x 4 Corner",
+          "size": [4, 4]
+        },
+        {
+          "file": "3007.dat",
+          "name": "Brick 2 x 8",
+          "size": [2, 8]
+        },
+        {
+          "file": "2465.dat",
+          "name": "Brick 1 x 16",
+          "size": [1, 16]
+        },
+        {
+          "file": "3006.dat",
+          "name": "Brick 2 x 10",
+          "size": [2, 10]
+        },
+        {
+          "file": "2356.dat",
+          "name": "Brick 4 x 6",
+          "size": [4, 6]
+        },
+        {
+          "file": "6212.dat",
+          "name": "Brick 4 x 10",
+          "size": [4, 10]
+        },
+        {
+          "file": "4202.dat",
+          "name": "Brick 4 x 12",
+          "size": [4, 12]
+        },
+        {
+          "file": "4201.dat",
+          "name": "Brick 8 x 8",
+          "size": [8, 8]
+        },
+        {
+          "file": "733.dat",
+          "name": "Brick 10 x 10",
+          "size": [10, 10]
+        },
+        {
+          "file": "4204.dat",
+          "name": "Brick 8 x 16",
+          "size": [8, 16]
+        },
+        {
+          "file": "30072.dat",
+          "name": "Brick 12 x 24",
+          "size": [12, 24]
+        }
+      ]
+    },
+    {
+      "id": "plate",
+      "label": "Plates",
+      "parts": [
+        {
+          "file": "3024.dat",
+          "name": "Plate 1 x 1",
+          "size": [1, 1]
+        },
+        {
+          "file": "6141.dat",
+          "name": "Plate 1 x 1 Round",
+          "size": [1, 1]
+        },
+        {
+          "file": "3023b.dat",
+          "name": "Plate 1 x 2",
+          "size": [1, 2]
+        },
+        {
+          "file": "3623.dat",
+          "name": "Plate 1 x 3",
+          "size": [1, 3]
+        },
+        {
+          "file": "2420.dat",
+          "name": "Plate 2 x 2 Corner",
+          "size": [2, 2]
+        },
+        {
+          "file": "26601.dat",
+          "name": "Plate 2 x 2 without Corner",
+          "size": [2, 2]
+        },
+        {
+          "file": "3022.dat",
+          "name": "Plate 2 x 2",
+          "size": [2, 2]
+        },
+        {
+          "file": "3710.dat",
+          "name": "Plate 1 x 4",
+          "size": [1, 4]
+        },
+        {
+          "file": "78329.dat",
+          "name": "Plate 1 x 5",
+          "size": [1, 5]
+        },
+        {
+          "file": "3021.dat",
+          "name": "Plate 2 x 3",
+          "size": [2, 3]
+        },
+        {
+          "file": "3666.dat",
+          "name": "Plate 1 x 6",
+          "size": [1, 6]
+        },
+        {
+          "file": "3020.dat",
+          "name": "Plate 2 x 4",
+          "size": [2, 4]
+        },
+        {
+          "file": "3460.dat",
+          "name": "Plate 1 x 8",
+          "size": [1, 8]
+        },
+        {
+          "file": "11212.dat",
+          "name": "Plate 3 x 3",
+          "size": [3, 3]
+        },
+        {
+          "file": "2450.dat",
+          "name": "Plate 3 x 3 without Corner",
+          "size": [3, 3]
+        },
+        {
+          "file": "77844.dat",
+          "name": "Plate 3 x 3 Corner",
+          "size": [3, 3]
+        },
+        {
+          "file": "4477.dat",
+          "name": "Plate 1 x 10",
+          "size": [1, 10]
+        },
+        {
+          "file": "3795.dat",
+          "name": "Plate 2 x 6",
+          "size": [2, 6]
+        },
+        {
+          "file": "60479.dat",
+          "name": "Plate 1 x 12",
+          "size": [1, 12]
+        },
+        {
+          "file": "2639.dat",
+          "name": "Plate 4 x 4 Corner",
+          "size": [4, 4]
+        },
+        {
+          "file": "3031.dat",
+          "name": "Plate 4 x 4",
+          "size": [4, 4]
+        },
+        {
+          "file": "30503.dat",
+          "name": "Plate 4 x 4 without Corner",
+          "size": [4, 4]
+        },
+        {
+          "file": "3034.dat",
+          "name": "Plate 2 x 8",
+          "size": [2, 8]
+        },
+        {
+          "file": "3832.dat",
+          "name": "Plate 2 x 10",
+          "size": [2, 10]
+        },
+        {
+          "file": "3032.dat",
+          "name": "Plate 4 x 6",
+          "size": [4, 6]
+        },
+        {
+          "file": "2445.dat",
+          "name": "Plate 2 x 12",
+          "size": [2, 12]
+        },
+        {
+          "file": "91988.dat",
+          "name": "Plate 2 x 14",
+          "size": [2, 14]
+        },
+        {
+          "file": "3035.dat",
+          "name": "Plate 4 x 8",
+          "size": [4, 8]
+        },
+        {
+          "file": "4282.dat",
+          "name": "Plate 2 x 16",
+          "size": [2, 16]
+        },
+        {
+          "file": "3958.dat",
+          "name": "Plate 6 x 6",
+          "size": [6, 6]
+        },
+        {
+          "file": "6106.dat",
+          "name": "Plate 6 x 6 without Corner",
+          "size": [6, 6]
+        },
+        {
+          "file": "3030.dat",
+          "name": "Plate 4 x 10",
+          "size": [4, 10]
+        },
+        {
+          "file": "3036.dat",
+          "name": "Plate 6 x 8",
+          "size": [6, 8]
+        },
+        {
+          "file": "3029.dat",
+          "name": "Plate 4 x 12",
+          "size": [4, 12]
+        },
+        {
+          "file": "3033.dat",
+          "name": "Plate 6 x 10",
+          "size": [6, 10]
+        },
+        {
+          "file": "30504.dat",
+          "name": "Plate 8 x 8 without Corner",
+          "size": [8, 8]
+        },
+        {
+          "file": "41539.dat",
+          "name": "Plate 8 x 8",
+          "size": [8, 8]
+        },
+        {
+          "file": "3028.dat",
+          "name": "Plate 6 x 12",
+          "size": [6, 12]
+        },
+        {
+          "file": "3456.dat",
+          "name": "Plate 6 x 14",
+          "size": [6, 14]
+        },
+        {
+          "file": "728.dat",
+          "name": "Plate 8 x 11",
+          "size": [8, 11]
+        },
+        {
+          "file": "3027.dat",
+          "name": "Plate 6 x 16",
+          "size": [6, 16]
+        },
+        {
+          "file": "2401.dat",
+          "name": "Plate 10 x 10 without Corner",
+          "size": [10, 10]
+        },
+        {
+          "file": "92438.dat",
+          "name": "Plate 8 x 16",
+          "size": [8, 16]
+        },
+        {
+          "file": "3026.dat",
+          "name": "Plate 6 x 24",
+          "size": [6, 24]
+        }
+      ]
+    },
+    {
+      "id": "tile",
+      "label": "Tiles",
+      "parts": [
+        {
+          "file": "3070b.dat",
+          "name": "Tile 1 x 1 with Groove",
+          "size": [1, 1]
+        },
+        {
+          "file": "3069b.dat",
+          "name": "Tile 1 x 2 with Groove",
+          "size": [1, 2]
+        },
+        {
+          "file": "63864.dat",
+          "name": "Tile 1 x 3",
+          "size": [1, 3]
+        },
+        {
+          "file": "3068b.dat",
+          "name": "Tile 2 x 2 with Groove",
+          "size": [2, 2]
+        },
+        {
+          "file": "2431.dat",
+          "name": "Tile 1 x 4 with Groove",
+          "size": [1, 4]
+        },
+        {
+          "file": "26603.dat",
+          "name": "Tile 2 x 3",
+          "size": [2, 3]
+        },
+        {
+          "file": "6636.dat",
+          "name": "Tile 1 x 6",
+          "size": [1, 6]
+        },
+        {
+          "file": "87079.dat",
+          "name": "Tile 2 x 4",
+          "size": [2, 4]
+        },
+        {
+          "file": "4162.dat",
+          "name": "Tile 1 x 8",
+          "size": [1, 8]
+        },
+        {
+          "file": "67095.dat",
+          "name": "Tile 3 x 3 Round",
+          "size": [3, 3]
+        },
+        {
+          "file": "69729.dat",
+          "name": "Tile 2 x 6",
+          "size": [2, 6]
+        },
+        {
+          "file": "1751.dat",
+          "name": "Tile 4 x 4",
+          "size": [4, 4]
+        },
+        {
+          "file": "6934.dat",
+          "name": "Tile 3 x 6",
+          "size": [3, 6]
+        },
+        {
+          "file": "8165.dat",
+          "name": "Tile 4 x 8",
+          "size": [4, 8]
+        },
+        {
+          "file": "7212.dat",
+          "name": "Tile 6 x 6 Round",
+          "size": [6, 6]
+        },
+        {
+          "file": "6320.dat",
+          "name": "Tile 6 x 8",
+          "size": [6, 8]
+        },
+        {
+          "file": "48288.dat",
+          "name": "Tile 8 x 16",
+          "size": [8, 16]
+        }
+      ]
+    },
+    {
+      "id": "slope",
+      "label": "Slopes",
+      "parts": [
+        {
+          "file": "35464.dat",
+          "name": "Slope Brick 45 1 x 1 Double",
+          "size": [1, 1]
+        },
+        {
+          "file": "54200.dat",
+          "name": "Slope Brick 31 1 x 1 x 0.667",
+          "size": [1, 1, 0.667]
+        },
+        {
+          "file": "11477.dat",
+          "name": "Slope Brick Curved 2 x 1",
+          "size": [2, 1]
+        },
+        {
+          "file": "3040b.dat",
+          "name": "Slope Brick 45 2 x 1",
+          "size": [2, 1]
+        },
+        {
+          "file": "3044b.dat",
+          "name": "Slope Brick 45 2 x 1 Double",
+          "size": [2, 1]
+        },
+        {
+          "file": "5404.dat",
+          "name": "Slope Brick 18 2 x 1 x 0.667",
+          "size": [2, 1, 0.667]
+        },
+        {
+          "file": "85984.dat",
+          "name": "Slope Brick 31 1 x 2 x 0.667",
+          "size": [1, 2, 0.667]
+        },
+        {
+          "file": "4286.dat",
+          "name": "Slope Brick 33 3 x 1",
+          "size": [3, 1]
+        },
+        {
+          "file": "50950.dat",
+          "name": "Slope Brick Curved 3 x 1",
+          "size": [3, 1]
+        },
+        {
+          "file": "7825.dat",
+          "name": "Slope Brick 31 1 x 3 x 0.667",
+          "size": [1, 3, 0.667]
+        },
+        {
+          "file": "3039.dat",
+          "name": "Slope Brick 45 2 x 2",
+          "size": [2, 2]
+        },
+        {
+          "file": "3043.dat",
+          "name": "Slope Brick 45 2 x 2 Double",
+          "size": [2, 2]
+        },
+        {
+          "file": "3300.dat",
+          "name": "Slope Brick 33 2 x 2 Double",
+          "size": [2, 2]
+        },
+        {
+          "file": "5654.dat",
+          "name": "Slope Brick 13 4 x 1",
+          "size": [4, 1]
+        },
+        {
+          "file": "60477.dat",
+          "name": "Slope Brick 18 4 x 1",
+          "size": [4, 1]
+        },
+        {
+          "file": "61678.dat",
+          "name": "Slope Brick Curved 4 x 1",
+          "size": [4, 1]
+        },
+        {
+          "file": "7835.dat",
+          "name": "Slope Brick 31 1 x 4 x 0.667",
+          "size": [1, 4, 0.667]
+        },
+        {
+          "file": "24309.dat",
+          "name": "Slope Brick Curved 3 x 2",
+          "size": [3, 2]
+        },
+        {
+          "file": "3038.dat",
+          "name": "Slope Brick 45 2 x 3",
+          "size": [2, 3]
+        },
+        {
+          "file": "3042.dat",
+          "name": "Slope Brick 45 2 x 3 Double",
+          "size": [2, 3]
+        },
+        {
+          "file": "3298.dat",
+          "name": "Slope Brick 33 3 x 2",
+          "size": [3, 2]
+        },
+        {
+          "file": "42022.dat",
+          "name": "Slope Brick Curved 6 x 1",
+          "size": [6, 1]
+        },
+        {
+          "file": "4569.dat",
+          "name": "Slope Brick 10 6 x 1",
+          "size": [6, 1]
+        },
+        {
+          "file": "30249.dat",
+          "name": "Slope Brick 55 1 x 6 x 5",
+          "size": [1, 6, 5]
+        },
+        {
+          "file": "30363.dat",
+          "name": "Slope Brick 18 4 x 2",
+          "size": [4, 2]
+        },
+        {
+          "file": "3037.dat",
+          "name": "Slope Brick 45 2 x 4",
+          "size": [2, 4]
+        },
+        {
+          "file": "3041.dat",
+          "name": "Slope Brick 45 2 x 4 Double",
+          "size": [2, 4]
+        },
+        {
+          "file": "3299.dat",
+          "name": "Slope Brick 33 2 x 4 Double",
+          "size": [2, 4]
+        },
+        {
+          "file": "93606.dat",
+          "name": "Slope Brick Curved 4 x 2",
+          "size": [4, 2]
+        },
+        {
+          "file": "49618.dat",
+          "name": "Slope Brick 33 8 x 1 x 3",
+          "size": [8, 1, 3]
+        },
+        {
+          "file": "4161.dat",
+          "name": "Slope Brick 33 3 x 3",
+          "size": [3, 3]
+        },
+        {
+          "file": "3297.dat",
+          "name": "Slope Brick 33 3 x 4",
+          "size": [3, 4]
+        },
+        {
+          "file": "23949.dat",
+          "name": "Slope Brick 45 2 x 6",
+          "size": [2, 6]
+        },
+        {
+          "file": "44126.dat",
+          "name": "Slope Brick Curved 6 x 2",
+          "size": [6, 2]
+        },
+        {
+          "file": "2875.dat",
+          "name": "Slope Brick 45 2 x 6 x 0.667",
+          "size": [2, 6, 0.667]
+        },
+        {
+          "file": "30182.dat",
+          "name": "Slope Brick 45 4 x 4",
+          "size": [4, 4]
+        },
+        {
+          "file": "42918.dat",
+          "name": "Slope Brick Curved 8 x 2",
+          "size": [8, 2]
+        },
+        {
+          "file": "4445.dat",
+          "name": "Slope Brick 45 2 x 8",
+          "size": [2, 8]
+        },
+        {
+          "file": "3939.dat",
+          "name": "Slope Brick 33 3 x 6",
+          "size": [3, 6]
+        },
+        {
+          "file": "32083.dat",
+          "name": "Slope Brick 45 6 x 4 Double",
+          "size": [6, 4]
+        },
+        {
+          "file": "4509.dat",
+          "name": "Slope Brick 33 6 x 6 Double",
+          "size": [6, 6]
+        },
+        {
+          "file": "4515.dat",
+          "name": "Slope Brick 10 6 x 8",
+          "size": [6, 8]
+        },
+        {
+          "file": "5120.dat",
+          "name": "Slope Brick 45 6 x 8 Double",
+          "size": [6, 8]
+        }
+      ]
+    },
+    {
+      "id": "round",
+      "label": "Round",
+      "parts": [
+        {
+          "file": "4740.dat",
+          "name": "Dish 2 x 2 Inverted",
+          "size": [2, 2]
+        },
+        {
+          "file": "6259.dat",
+          "name": "Cylinder 2 x 4 x 4",
+          "size": [2, 4, 4]
+        },
+        {
+          "file": "43898.dat",
+          "name": "Dish 3 x 3 Inverted",
+          "size": [3, 3]
+        },
+        {
+          "file": "6233.dat",
+          "name": "Cone 3 x 3 x 2",
+          "size": [3, 3, 2]
+        },
+        {
+          "file": "3960.dat",
+          "name": "Dish 4 x 4 Inverted",
+          "size": [4, 4]
+        },
+        {
+          "file": "272.dat",
+          "name": "Cone 4 x 4 x 3",
+          "size": [4, 4, 3]
+        }
+      ]
+    },
+    {
+      "id": "angle",
+      "label": "Brackets & hinges",
+      "parts": [
+        {
+          "file": "18986.dat",
+          "name": "Bracket 1 x 1 - 1 x 2",
+          "size": [1, 1, 1, 2]
+        },
+        {
+          "file": "2540.dat",
+          "name": "Plate 1 x 2 with Handle",
+          "size": [1, 2]
+        },
+        {
+          "file": "6970.dat",
+          "name": "Bracket 1 x 2 - 2 x 6",
+          "size": [1, 2, 2, 6]
+        },
+        {
+          "file": "93274.dat",
+          "name": "Bracket 1 x 2 - 2 x 4",
+          "size": [1, 2, 2, 4]
+        },
+        {
+          "file": "2422.dat",
+          "name": "Bracket 2 x 2 - 1 x 4",
+          "size": [2, 2, 1, 4]
+        },
+        {
+          "file": "3830.dat",
+          "name": "Hinge Brick 1 x 4 Top",
+          "size": [1, 4]
+        },
+        {
+          "file": "3831.dat",
+          "name": "Hinge Brick 1 x 4 Base",
+          "size": [1, 4]
+        },
+        {
+          "file": "4598.dat",
+          "name": "Bracket 2 x 3 - 2 x 2",
+          "size": [2, 3, 2, 2]
+        }
+      ]
+    },
+    {
+      "id": "wall",
+      "label": "Panels, windows & doors",
+      "parts": [
+        {
+          "file": "4490.dat",
+          "name": "Arch 1 x 3",
+          "size": [1, 3]
+        },
+        {
+          "file": "6798.dat",
+          "name": "Window 1 x 3 x 2 Frame",
+          "size": [1, 3, 2]
+        },
+        {
+          "file": "51239.dat",
+          "name": "Window 1 x 3 x 3 Frame",
+          "size": [1, 3, 3]
+        },
+        {
+          "file": "3579.dat",
+          "name": "Door 1 x 3 x 4 Frame",
+          "size": [1, 3, 4]
+        },
+        {
+          "file": "3659.dat",
+          "name": "Arch 1 x 4",
+          "size": [1, 4]
+        },
+        {
+          "file": "4215a.dat",
+          "name": "Panel 1 x 4 x 3",
+          "size": [1, 4, 3]
+        },
+        {
+          "file": "60596.dat",
+          "name": "Door 1 x 4 x 6 Frame",
+          "size": [1, 4, 6]
+        },
+        {
+          "file": "2466.dat",
+          "name": "Panel 3 x 2 x 6",
+          "size": [3, 2, 6]
+        },
+        {
+          "file": "3455.dat",
+          "name": "Arch 1 x 6",
+          "size": [1, 6]
+        },
+        {
+          "file": "59349.dat",
+          "name": "Panel 1 x 6 x 5",
+          "size": [1, 6, 5]
+        },
+        {
+          "file": "42205.dat",
+          "name": "Door 1 x 6 x 6 Frame",
+          "size": [1, 6, 6]
+        },
+        {
+          "file": "670.dat",
+          "name": "Door 1 x 6 x 10 Frame",
+          "size": [1, 6, 10]
+        },
+        {
+          "file": "4130.dat",
+          "name": "Door 2 x 4 x 5 Frame",
+          "size": [2, 4, 5]
+        },
+        {
+          "file": "60599.dat",
+          "name": "Door 2 x 4 x 6 Frame",
+          "size": [2, 4, 6]
+        },
+        {
+          "file": "7567.dat",
+          "name": "Panel 1 x 8 x 5",
+          "size": [1, 8, 5]
+        },
+        {
+          "file": "40242.dat",
+          "name": "Door 1 x 8 x 6 Frame",
+          "size": [1, 8, 6]
+        },
+        {
+          "file": "30079.dat",
+          "name": "Panel 3 x 3 x 3",
+          "size": [3, 3, 3]
+        },
+        {
+          "file": "4071.dat",
+          "name": "Door 2 x 6 x 7 Frame",
+          "size": [2, 6, 7]
+        },
+        {
+          "file": "2408.dat",
+          "name": "Panel 10 x 6 x 11",
+          "size": [10, 6, 11]
+        },
+        {
+          "file": "2409.dat",
+          "name": "Panel 10 x 10 x 12 Corner",
+          "size": [10, 10, 12]
+        }
+      ]
+    },
+    {
+      "id": "wheel",
+      "label": "Wheels",
+      "parts": [
+        {
+          "file": "100942.dat",
+          "name": "Wheel 37 x 45 Hard-Plastic with 6 Curved Spokes",
+          "size": []
+        },
+        {
+          "file": "105162.dat",
+          "name": "Wheel 13.4 x 24 with Integral Smooth Racing Tyre",
+          "size": []
+        },
+        {
+          "file": "105645.dat",
+          "name": "Wheel 22 x 50 with Integral Smooth Racing Tyre",
+          "size": []
+        },
+        {
+          "file": "110100.dat",
+          "name": "Wheel 14.9 x 24 with Integral Smooth Racing Tyre",
+          "size": []
+        },
+        {
+          "file": "110638.dat",
+          "name": "Wheel 30 x 50 with Integral Smooth Racing Tyre",
+          "size": []
+        },
+        {
+          "file": "11094.dat",
+          "name": "Wheel 30 x 64 with 7 Pin Holes and 6 Small Holes",
+          "size": []
+        },
+        {
+          "file": "11208.dat",
+          "name": "Wheel Rim 10 x 14 with Fake Bolts and 6 Spokes",
+          "size": []
+        },
+        {
+          "file": "11209.dat",
+          "name": "Tyre 10/ 32 x 14",
+          "size": []
+        },
+        {
+          "file": "11957.dat",
+          "name": "Tyre 19/ 67 x 75 Motorcycle with Motocross Tread",
+          "size": []
+        },
+        {
+          "file": "13971.dat",
+          "name": "Wheel Rim 8 x 18 with Deep Centre Groove, Deep Spokes and Peghole",
+          "size": []
+        },
+        {
+          "file": "15038.dat",
+          "name": "Wheel Rim 34 x 56 with 6 Spokes and 6 Pegholes",
+          "size": []
+        },
+        {
+          "file": "15413.dat",
+          "name": "Tyre 20/ 48 x 30",
+          "size": []
+        },
+        {
+          "file": "18450.dat",
+          "name": "Tyre 44/ 91 x 43 R",
+          "size": []
+        },
+        {
+          "file": "1872.dat",
+          "name": "Wheel Rim 11 x 18 Front with 36 Spokes and Knock-off Hub Nut",
+          "size": []
+        }
+      ]
+    },
+    {
+      "id": "base",
+      "label": "Baseplates",
+      "parts": [
+        {
+          "file": "819.dat",
+          "name": "Baseplate 8 x 12",
+          "size": [8, 12]
+        },
+        {
+          "file": "3865.dat",
+          "name": "Baseplate 8 x 16",
+          "size": [8, 16]
+        },
+        {
+          "file": "397.dat",
+          "name": "Baseplate 10 x 16",
+          "size": [10, 16]
+        },
+        {
+          "file": "3497.dat",
+          "name": "Baseplate 8 x 24",
+          "size": [8, 24]
+        },
+        {
+          "file": "3867.dat",
+          "name": "Baseplate 16 x 16",
+          "size": [16, 16]
+        },
+        {
+          "file": "4187.dat",
+          "name": "Baseplate 8 x 32",
+          "size": [8, 32]
+        },
+        {
+          "file": "6850.dat",
+          "name": "Baseplate 16 x 18",
+          "size": [16, 18]
+        },
+        {
+          "file": "210.dat",
+          "name": "Baseplate 16 x 22",
+          "size": [16, 22]
+        },
+        {
+          "file": "3334.dat",
+          "name": "Baseplate 16 x 24",
+          "size": [16, 24]
+        },
+        {
+          "file": "3645.dat",
+          "name": "Baseplate 24 x 40",
+          "size": [24, 40]
+        }
+      ]
+    }
+  ]
+}

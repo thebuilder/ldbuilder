@@ -135,7 +135,8 @@ describe("SceneController build mode", () => {
     await run(4);
 
     expect(
-      (controller as unknown as { renderer: FakeRenderer }).renderer.renders
+      (controller as unknown as { viewport: { renderer: FakeRenderer } })
+        .viewport.renderer.renders
     ).toBeGreaterThan(0);
   });
 
@@ -287,13 +288,15 @@ describe("SceneController build mode", () => {
  * rather than a fact.
  */
 function lookDownAt(x: number, y: number, z: number): void {
-  const scene = controller as unknown as {
-    camera: {
-      lookAt: (x: number, y: number, z: number) => void;
-      position: { set: (x: number, y: number, z: number) => void };
-      updateMatrixWorld: (force: boolean) => void;
+  const { viewport: scene } = controller as unknown as {
+    viewport: {
+      camera: {
+        lookAt: (x: number, y: number, z: number) => void;
+        position: { set: (x: number, y: number, z: number) => void };
+        updateMatrixWorld: (force: boolean) => void;
+      };
+      controls: { target: { set: (x: number, y: number, z: number) => void } };
     };
-    controls: { target: { set: (x: number, y: number, z: number) => void } };
   };
   scene.camera.position.set(x, y + 400, z);
   scene.controls.target.set(x, y, z);
@@ -485,9 +488,11 @@ describe("SceneController dragging", () => {
 describe("SceneController watch mode", () => {
   it("frames the table while assembling and the model while inspecting", () => {
     controller.setModel(buildableModel());
-    const { camera } = controller as unknown as {
-      camera: { position: { length: () => number } };
-    };
+    const { camera } = (
+      controller as unknown as {
+        viewport: { camera: { position: { length: () => number } } };
+      }
+    ).viewport;
 
     controller.setInput(input({ mode: "assemble" }));
     const table = camera.position.length();
@@ -543,9 +548,11 @@ describe("SceneController watch mode", () => {
   it("re-frames on request, and toggles between the two framings", () => {
     controller.setModel(buildableModel());
     controller.setInput(input());
-    const { camera } = controller as unknown as {
-      camera: { position: { length: () => number } };
-    };
+    const { camera } = (
+      controller as unknown as {
+        viewport: { camera: { position: { length: () => number } } };
+      }
+    ).viewport;
 
     const before = camera.position.length();
     controller.frameModel(true);

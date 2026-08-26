@@ -14,6 +14,7 @@
     "ldraw:index": "node scripts/fetch-omr-index.mjs",
     "ldraw:omr": "node scripts/fetch-omr.mjs",
     "ldraw:pack": "node scripts/pack-models.mjs",
+    "ldraw:palette": "node scripts/pack-palette.mjs",
     "ldraw:setup": "node scripts/setup-ldraw.mjs",
     "start": "next start",
     "test": "vitest run",
