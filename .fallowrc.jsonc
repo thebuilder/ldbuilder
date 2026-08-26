@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "ignoreDependencies": [
+    // Build-time only. globals.css does `@import "tailwindcss"`, which PostCSS
+    // resolves during `next build` and compiles away; nothing imports it at
+    // runtime. devDependencies is correct, and CI installs all deps before
+    // building, so a --prod install never has to resolve it.
+    "tailwindcss"
+  ],
+  "rules": {
+    // Syntactic analysis cannot see `controllerRef.current?.setModel(...)`, so
+    // SceneController's public methods look unused. Running with --type-aware
+    // resolves them correctly (3 findings -> 0), which is the check to trust
+    // before deleting anything here.
+    "unused-class-members": "warn"
+  }
+}

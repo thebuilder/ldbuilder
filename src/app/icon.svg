@@ -1,0 +1,9 @@
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <title>LDraw Builder</title>
+  <rect fill="#0e0f12" height="32" rx="6" width="32" />
+  <!-- A 2x2 brick seen from the front: studs on top, body below. -->
+  <rect fill="#6fb2f5" height="4" rx="1.2" width="5" x="8" y="8" />
+  <rect fill="#6fb2f5" height="4" rx="1.2" width="5" x="19" y="8" />
+  <rect fill="#1c6bd6" height="13" rx="2" width="20" x="6" y="11" />
+  <rect fill="#2b7ae2" height="3" opacity="0.5" width="20" x="6" y="11" />
+</svg>

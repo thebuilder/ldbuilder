@@ -1,0 +1,32 @@
+{
+  "extends": [
+    "ultracite/biome/core",
+    "ultracite/biome/react",
+    "ultracite/biome/next"
+  ],
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "linter": {
+    "rules": {
+      "style": {
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": {
+            "filenameCases": ["camelCase", "PascalCase", "kebab-case"],
+            "strictCase": false
+          }
+        }
+      },
+      "performance": {
+        "noJsxPropsBind": "off"
+      }
+    }
+  },
+  "files": {
+    "includes": [
+      "!src/ldraw/colors.generated.ts",
+      "!ldraw-library",
+      "!demo-models",
+      "!public/models"
+    ]
+  }
+}
