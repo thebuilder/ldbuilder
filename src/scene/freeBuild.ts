@@ -1,4 +1,11 @@
-import { Box3, Matrix4, Quaternion, Vector3 } from "three";
+import { Matrix4, Quaternion, Vector3 } from "three";
+import {
+  contactHeight,
+  lowestOf,
+  type Profile,
+  profilesCollide,
+  type Standing,
+} from "./heightField";
 
 /**
  * Where a brick may go, and what a build of them looks like written down.
@@ -106,26 +113,6 @@ export function snapCenterToGrid(center: number, extent: number): number {
   return Math.round((center - offset) / STUD) * STUD + offset;
 }
 
-/** The world box a part would fill at this pose. */
-export function boxFor(
-  position: Vector3,
-  half: Vector3,
-  center: Vector3,
-  target: Box3
-): Box3 {
-  target.min.set(
-    position.x + center.x - half.x,
-    position.y + center.y - half.y,
-    position.z + center.z - half.z
-  );
-  target.max.set(
-    position.x + center.x + half.x,
-    position.y + center.y + half.y,
-    position.z + center.z + half.z
-  );
-  return target;
-}
-
 export interface SnapResult {
   /** True when the part would pass through something already built. */
   blocked: boolean;
@@ -136,8 +123,8 @@ export interface SnapResult {
 }
 
 export interface SnapInput {
-  /** Boxes of everything already built, by placement id. */
-  built: Map<number, Box3>;
+  /** Everything already built, by placement id. */
+  built: Map<number, Standing>;
   center: Vector3;
   /** Where the pointer is asking for the part to be, before snapping. */
   desired: Vector3;
@@ -145,9 +132,16 @@ export interface SnapInput {
   half: Vector3;
   /** Lattice steps the person has nudged it by, after snapping. */
   nudge: { x: number; y: number; z: number };
+  /** The carried part, measured into columns at its current orientation. */
+  profile: Profile;
 }
 
-const scratchBox = new Box3();
+interface Level {
+  /** The placement being rested on, or null for the floor. */
+  on: number | null;
+  /** Where the part's origin would sit. */
+  y: number;
+}
 
 /**
  * Snap a carried part: onto the grid in X and Z, and down onto whatever is
@@ -158,142 +152,95 @@ const scratchBox = new Box3();
  * brick placed on it should sit there rather than at the nearest multiple of 8.
  */
 export function snapPlacement(input: SnapInput, target: Vector3): SnapResult {
-  const { desired, half, center, built, floorY, nudge } = input;
+  const { desired, half, center, built, floorY, nudge, profile } = input;
 
-  const centerX =
-    snapCenterToGrid(desired.x + center.x, half.x * 2) + nudge.x * STUD;
-  const centerZ =
-    snapCenterToGrid(desired.z + center.z, half.z * 2) + nudge.z * STUD;
+  const x =
+    snapCenterToGrid(desired.x + center.x, half.x * 2) +
+    nudge.x * STUD -
+    center.x;
+  const z =
+    snapCenterToGrid(desired.z + center.z, half.z * 2) +
+    nudge.z * STUD -
+    center.z;
 
   // The footprint is known before the height is, which is what lets the height
   // be read off whatever that footprint covers.
-  const surfaces = surfacesUnder(built, floorY, {
-    maxX: centerX + half.x - TOUCH_EPSILON,
-    maxZ: centerZ + half.z - TOUCH_EPSILON,
-    minX: centerX - half.x + TOUCH_EPSILON,
-    minZ: centerZ - half.z + TOUCH_EPSILON,
-  });
+  const lowest = lowestOf(profile);
+  const levels = levelsUnder(profile, x, z, built, floorY - lowest);
 
-  // Nearest to where the pointer actually is, rather than the highest. The ray
-  // lands on the face somebody is pointing at, so pointing at the top of a
-  // brick halfway up a stack means that brick, not the top of the stack: it is
-  // the difference between building on something and only ever building upward.
-  surfaces.sort(
-    (a, b) => Math.abs(a.y - desired.y) - Math.abs(b.y - desired.y)
+  // Nearest to where the pointer actually is, rather than the highest, and
+  // measured at the part's underside so it is the face somebody is pointing at.
+  // Pointing at the top of a brick halfway up a stack means that brick, not the
+  // top of the stack: it is the difference between building on something and
+  // only ever building upward.
+  levels.sort(
+    (a, b) =>
+      Math.abs(a.y + lowest - desired.y) - Math.abs(b.y + lowest - desired.y)
   );
 
   // A height set by hand is a decision, so it is placed where it was asked for
   // and reported as not fitting if it does not. Otherwise take the nearest
-  // surface the part actually fits on.
-  const search = nudge.y === 0 ? surfaces : surfaces.slice(0, 1);
-  const [nearest] = surfaces;
+  // level the part actually fits at.
+  const search = nudge.y === 0 ? levels : levels.slice(0, 1);
+  const [nearest] = levels;
   let chosen = nearest;
   let blocked = true;
 
-  for (const surface of search) {
-    place(target, surface.y, centerX, centerZ, half, center, nudge);
-    if (!collides(target, half, center, built)) {
-      chosen = surface;
+  for (const level of search) {
+    target.set(x, level.y + nudge.y * PLATE, z);
+    if (!obstructed(profile, target, built)) {
+      chosen = level;
       blocked = false;
       break;
     }
   }
   if (blocked) {
-    place(target, chosen.y, centerX, centerZ, half, center, nudge);
+    target.set(x, chosen.y + nudge.y * PLATE, z);
   }
 
   return { blocked, position: target, restingOn: chosen.on };
 }
 
-interface Footprint {
-  maxX: number;
-  maxZ: number;
-  minX: number;
-  minZ: number;
-}
-
-interface Surface {
-  /** The placement this surface belongs to, or null for the floor. */
-  on: number | null;
-  y: number;
-}
-
 /**
- * Every height a part could come to rest at under this footprint.
+ * Every height the part could come to rest at over this footprint.
  *
- * One per distinct surface, because a wall of bricks all at the same level is
- * one place to put something down rather than twenty.
+ * One per distinct height, because a wall of bricks all at the same level is
+ * one place to put something down rather than twenty. Anything that would put
+ * the part through the floor is not a place to put it down at all.
  */
-function surfacesUnder(
-  built: Map<number, Box3>,
-  floorY: number,
-  footprint: Footprint
-): Surface[] {
-  const surfaces: Surface[] = [{ on: null, y: floorY }];
+function levelsUnder(
+  profile: Profile,
+  x: number,
+  z: number,
+  built: Map<number, Standing>,
+  floorLevel: number
+): Level[] {
+  const levels: Level[] = [{ on: null, y: floorLevel }];
 
-  for (const [id, box] of built) {
-    if (box.max.x <= footprint.minX || box.min.x >= footprint.maxX) {
+  for (const [id, standing] of built) {
+    const y = contactHeight(profile, x, z, standing);
+    if (y === null || y < floorLevel - TOUCH_EPSILON) {
       continue;
     }
-    if (box.max.z <= footprint.minZ || box.min.z >= footprint.maxZ) {
+    if (levels.some((level) => Math.abs(level.y - y) < TOUCH_EPSILON)) {
       continue;
     }
-    if (
-      surfaces.some(
-        (surface) => Math.abs(surface.y - box.max.y) < TOUCH_EPSILON
-      )
-    ) {
-      continue;
-    }
-    surfaces.push({ on: id, y: box.max.y });
+    levels.push({ on: id, y });
   }
-  return surfaces;
+  return levels;
 }
 
-function place(
-  target: Vector3,
-  rest: number,
-  centerX: number,
-  centerZ: number,
-  half: Vector3,
-  center: Vector3,
-  nudge: { x: number; y: number; z: number }
-): void {
-  target.set(
-    centerX - center.x,
-    rest + half.y - center.y + nudge.y * PLATE,
-    centerZ - center.z
-  );
-}
-
-/**
- * Resting leaves the two boxes sharing a face, which `overlaps` does not count,
- * so the part being stood on needs no special case here.
- */
-function collides(
+function obstructed(
+  profile: Profile,
   position: Vector3,
-  half: Vector3,
-  center: Vector3,
-  built: Map<number, Box3>
+  built: Map<number, Standing>
 ): boolean {
-  boxFor(position, half, center, scratchBox);
-  for (const [, box] of built) {
-    if (overlaps(scratchBox, box)) {
+  for (const [, standing] of built) {
+    if (profilesCollide(profile, position, standing)) {
       return true;
     }
   }
   return false;
-}
-
-function overlaps(a: Box3, b: Box3): boolean {
-  return (
-    a.min.x < b.max.x - TOUCH_EPSILON &&
-    a.max.x > b.min.x + TOUCH_EPSILON &&
-    a.min.y < b.max.y - TOUCH_EPSILON &&
-    a.max.y > b.min.y + TOUCH_EPSILON &&
-    a.min.z < b.max.z - TOUCH_EPSILON &&
-    a.max.z > b.min.z + TOUCH_EPSILON
-  );
 }
 
 /**

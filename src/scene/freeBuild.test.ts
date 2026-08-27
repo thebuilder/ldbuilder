@@ -1,7 +1,6 @@
-import { Box3, Quaternion, Vector3 } from "three";
+import { Quaternion, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import {
-  boxFor,
   orientation,
   PLATE,
   type Placement,
@@ -12,6 +11,7 @@ import {
   snapPlacement,
   toLdrawFile,
 } from "./freeBuild";
+import { COLUMN, type Profile, type Standing } from "./heightField";
 
 /**
  * A 2 x 4 brick: 40 x 24 x 80 LDraw units.
@@ -24,6 +24,12 @@ const brick2x4 = {
   localCenter: new Vector3(0, 12, 0),
 };
 
+/** A 2 x 2 brick: the footprint the stepped fixtures below are cut to. */
+const brick2x2 = {
+  halfExtents: new Vector3(20, 12, 20),
+  localCenter: new Vector3(0, 12, 0),
+};
+
 /** A 1 x 1 brick, the odd-footprint case. */
 const brick1x1 = {
   halfExtents: new Vector3(10, 12, 10),
@@ -32,18 +38,74 @@ const brick1x1 = {
 
 const upright = () => orientation(0, 0, new Quaternion());
 
-const placed = (position: Vector3, part = brick2x4) => {
+/** A part that really is one slab, which is what a plain brick is. */
+const slab = (part = brick2x4): Profile => {
   const q = upright();
   const half = rotatedHalfExtents(part.halfExtents, q, new Vector3());
   const center = rotatedCenter(part.localCenter, q, new Vector3());
-  return boxFor(position, half, center, new Box3());
+  const cols = Math.round((half.x * 2) / COLUMN);
+  const rows = Math.round((half.z * 2) / COLUMN);
+  return {
+    anchorX: center.x - half.x,
+    anchorZ: center.z - half.z,
+    bottom: new Float32Array(cols * rows).fill(center.y - half.y),
+    cols,
+    rows,
+    top: new Float32Array(cols * rows).fill(center.y + half.y),
+  };
 };
+
+/**
+ * A 2 x 2 part with a step in it: `levels` gives one [bottom, top] pair per
+ * column along X, repeated across Z. Enough shape to stand in for the two parts
+ * a bounding box gets wrong, a bracket and a slope.
+ */
+const stepped = (levels: [number, number][]): Profile => {
+  const cols = levels.length;
+  const rows = 4;
+  const bottom = new Float32Array(cols * rows);
+  const top = new Float32Array(cols * rows);
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      bottom[row * cols + col] = levels[col][0];
+      top[row * cols + col] = levels[col][1];
+    }
+  }
+  return { anchorX: -20, anchorZ: -20, bottom, cols, rows, top };
+};
+
+/** Deep along half its length, shallow along the other: a bracket. */
+const BRACKET: [number, number][] = [
+  [-24, 0],
+  [-24, 0],
+  [-8, 0],
+  [-8, 0],
+];
+
+/** Low along half its length, full height along the other: a slope. */
+const WEDGE: [number, number][] = [
+  [-24, -12],
+  [-24, -12],
+  [-24, 0],
+  [-24, 0],
+];
+
+const placed = (position: Vector3, part = brick2x4): Standing => ({
+  position,
+  profile: slab(part),
+});
+
+const standing = (position: Vector3, profile: Profile): Standing => ({
+  position,
+  profile,
+});
 
 const snap = (
   desired: Vector3,
   part = brick2x4,
-  built = new Map<number, Box3>(),
-  nudge = { x: 0, y: 0, z: 0 }
+  built = new Map<number, Standing>(),
+  nudge = { x: 0, y: 0, z: 0 },
+  profile = slab(part)
 ) => {
   const q = upright();
   return snapPlacement(
@@ -54,6 +116,7 @@ const snap = (
       floorY: 0,
       half: rotatedHalfExtents(part.halfExtents, q, new Vector3()),
       nudge,
+      profile,
     },
     new Vector3()
   );
@@ -297,5 +360,63 @@ describe("toLdrawFile", () => {
 
   it("ends on a step, so a reader shows the whole thing", () => {
     expect(toLdrawFile([place()], "x").trimEnd().endsWith("0 STEP")).toBe(true);
+  });
+});
+
+describe("snapPlacement, parts with more than one level", () => {
+  it("rests a brick on the low end of a slope, not on its high end", () => {
+    // Without columns the slope is one box 24 tall, and anything put on it sits
+    // at the top of that box: the floating brick this is all here to stop.
+    const built = new Map([
+      [1, standing(new Vector3(0, 24, 0), stepped(WEDGE))],
+    ]);
+
+    const result = snap(new Vector3(-20, 12, 0), brick2x2, built);
+
+    expect(result.position.y).toBeCloseTo(36, 6);
+    expect(result.restingOn).toBe(1);
+    expect(result.blocked).toBe(false);
+  });
+
+  it("rests a bracket on the step that reaches what is under it", () => {
+    // The support only reaches the shallow half, so the shallow half is what
+    // takes the weight and the deep half hangs clear.
+    const built = new Map([[1, placed(new Vector3(40, 24, 0), brick2x2)]]);
+
+    const result = snap(
+      new Vector3(20, 24, 0),
+      brick2x2,
+      built,
+      undefined,
+      stepped(BRACKET)
+    );
+
+    expect(result.position.y).toBeCloseTo(32, 6);
+    expect(result.restingOn).toBe(1);
+  });
+
+  it("rests the same bracket lower when the deep step is the one supported", () => {
+    const built = new Map([[1, placed(new Vector3(-40, 24, 0), brick2x2)]]);
+
+    const result = snap(
+      new Vector3(-20, 24, 0),
+      brick2x2,
+      built,
+      undefined,
+      stepped(BRACKET)
+    );
+
+    expect(result.position.y).toBeCloseTo(48, 6);
+    expect(result.restingOn).toBe(1);
+  });
+
+  it("lets a brick sit beside a slope's high end without calling it blocked", () => {
+    const built = new Map([
+      [1, standing(new Vector3(0, 24, 0), stepped(WEDGE))],
+    ]);
+
+    const result = snap(new Vector3(-20, 12, 0), brick2x2, built);
+
+    expect(result.blocked).toBe(false);
   });
 });

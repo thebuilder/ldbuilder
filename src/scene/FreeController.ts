@@ -17,7 +17,6 @@ import {
 import type { Brick } from "@/ldraw/types";
 import { readFreeBuild, writeFreeBuild } from "@/lib/freeStore";
 import {
-  boxFor,
   orientation,
   type Placement,
   rotatedCenter,
@@ -26,6 +25,12 @@ import {
   snapPlacement,
   toLdrawFile,
 } from "./freeBuild";
+import {
+  boundsOf,
+  type Profile,
+  profileOf,
+  type Standing,
+} from "./heightField";
 import { LiveWorld } from "./liveWorld";
 import { loadPhysics } from "./physics";
 import { RenderLoop } from "./RenderLoop";
@@ -128,7 +133,14 @@ export class FreeController {
   /** Every instance ever made, by id. Holes are instances that were deleted. */
   private readonly instances: (Brick | undefined)[] = [];
   private readonly placements = new Map<number, Placement>();
-  private readonly placedBoxes = new Map<number, Box3>();
+  private readonly placed = new Map<number, Standing>();
+  /**
+   * Column profiles, by part and orientation.
+   *
+   * Measuring one costs a walk over the part's triangles, and the answer only
+   * changes when the part is turned, so the same handful are reused all session.
+   */
+  private readonly profiles = new Map<string, Profile>();
   private readonly loose = new Set<number>();
   private carried: Carried | null = null;
   private armed: Armed | null = null;
@@ -337,7 +349,10 @@ export class FreeController {
       yaw: carried.yaw,
     };
     this.placements.set(brick.id, placement);
-    this.placedBoxes.set(brick.id, this.boxOf(carried, position));
+    this.placed.set(brick.id, {
+      position,
+      profile: this.profileFor(carried.part, carried.yaw, carried.tip),
+    });
     this.world.addStatic(brick);
     this.carried = null;
 
@@ -407,8 +422,9 @@ export class FreeController {
 
   frame(): void {
     const box = new Box3();
-    for (const placed of this.placedBoxes.values()) {
-      box.union(placed);
+    const standing = new Box3();
+    for (const entry of this.placed.values()) {
+      box.union(boundsOf(entry, standing));
     }
     if (box.isEmpty()) {
       // An empty floor still needs a sensible amount of it on screen: about
@@ -500,12 +516,13 @@ export class FreeController {
     }
     const result = snapPlacement(
       {
-        built: this.placedBoxes,
+        built: this.placed,
         center: this.center,
         desired: this.desired,
         floorY: FLOOR_Y,
         half: this.halfExtents,
         nudge: carried.nudge,
+        profile: this.profileFor(carried.part, carried.yaw, carried.tip),
       },
       this.snapped
     );
@@ -628,7 +645,7 @@ export class FreeController {
     const placement = this.placements.get(id);
     if (placement) {
       this.placements.delete(id);
-      this.placedBoxes.delete(id);
+      this.placed.delete(id);
       this.world.removeStatic(id);
     } else {
       this.world.despawn(id);
@@ -700,7 +717,7 @@ export class FreeController {
     this.world?.removeStatic(id);
     brick.object.removeFromParent();
     this.placements.delete(id);
-    this.placedBoxes.delete(id);
+    this.placed.delete(id);
     this.loose.delete(id);
     this.instances[id] = undefined;
   }
@@ -721,9 +738,23 @@ export class FreeController {
     rotatedCenter(carried.part.solidCenter, this.quaternion, this.center);
   }
 
-  private boxOf(carried: Carried, position: Vector3): Box3 {
-    this.poseOf(carried);
-    return boxFor(position, this.halfExtents, this.center, new Box3()).clone();
+  /**
+   * The part's columns at this orientation, measured once and kept.
+   */
+  private profileFor(part: PalettePart, yaw: number, tip: number): Profile {
+    const key = `${part.file}|${yaw}|${tip}`;
+    const known = this.profiles.get(key);
+    if (known) {
+      return known;
+    }
+    // Its own quaternion, not the shared scratch one: this is called in the
+    // middle of posing a part, and posing it is what the scratch one is for.
+    const profile = profileOf(
+      part.meshes,
+      orientation(yaw, tip, new Quaternion())
+    );
+    this.profiles.set(key, profile);
+    return profile;
   }
 
   private report(force = false): void {
@@ -812,16 +843,10 @@ export class FreeController {
         yaw: entry.y,
       };
       this.placements.set(brick.id, placement);
-      rotatedHalfExtents(
-        part.solidHalfExtents,
-        this.quaternion,
-        this.halfExtents
-      );
-      rotatedCenter(part.solidCenter, this.quaternion, this.center);
-      this.placedBoxes.set(
-        brick.id,
-        boxFor(position, this.halfExtents, this.center, new Box3()).clone()
-      );
+      this.placed.set(brick.id, {
+        position,
+        profile: this.profileFor(part, entry.y, entry.t),
+      });
       this.world.addStatic(brick);
     }
 
