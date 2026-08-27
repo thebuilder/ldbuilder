@@ -98,20 +98,52 @@ and lifts the author and theme out for the gallery card.
 
 Only two sets ship with the app. The rest are a set number away: the gallery has
 an **Open an official set** card, which goes through `/api/omr/[set]` because the
-OMR serves no CORS headers and the set still has to be packed against the parts
-library on the way through. That route needs `pnpm ldraw:setup` to have been run
-on the server.
+OMR serves no CORS headers and the set still has to be packed on the way
+through.
 
 ### Bringing your own
 
 Drag an `.ldr` or `.mpd` anywhere onto the page. A self-contained `.mpd` opens
 straight from the browser with no server involved. A raw `.ldr` is posted to
-`/api/pack`, which resolves it against the installed parts library.
+`/api/pack`, which resolves its parts the same way `/api/omr` does.
 
 Models that use unofficial parts will have references the library cannot
 resolve. Those parts are skipped and the rest of the model still builds, with a
 warning naming what is missing. Only a model where *nothing* resolves is
 refused, since there would be nothing left to look at.
+
+### Where parts come from at request time
+
+The two packing routes need somewhere to resolve `3001.dat` from, and a
+deployment has no parts library: 36,600 files and 612 MB does not fit in a
+serverless bundle and has no business in git. So `src/server/parts-resolver.ts`
+picks a source at startup:
+
+| | used when | speed |
+| --- | --- | --- |
+| the local library | `pnpm ldraw:setup` has been run | instant |
+| the network | anywhere else, including every deployment | 10-30 s cold, then cached |
+
+The network resolver tries a [jsDelivr-hosted mirror][mirror] of the library
+first and falls back to library.ldraw.org for anything the mirror lacks. The
+order matters: the mirror is a CDN and does not rate limit, while the library
+itself starts returning `429` at four concurrent requests, and a single set is
+roughly 400 lookups. Going mirror-first means the origin is asked only for the
+handful of parts added since the mirror was taken.
+
+Both produce the same model. Packing three real sets, from 368 to 5,246 bricks,
+against each source resolved every reference with nothing missing either way.
+The mirror is an older snapshot, so some parts have since been re-subfiled and
+the two outputs are not byte-identical, but no brick goes missing.
+
+Packed sets are returned gzipped (about 6.4:1 on this content, so a 3.8 MB set
+is 612 KB on the wire) with a one-year `s-maxage`. A published set never
+changes, so only the first person to open one pays for it.
+
+Set `LDRAW_PARTS_SOURCE=network` to exercise the deployment path on a machine
+that does have the library installed.
+
+[mirror]: https://github.com/gkjohnson/ldraw-parts-library
 
 ## How it works
 

@@ -7,6 +7,22 @@
     // building, so a --prod install never has to resolve it.
     "tailwindcss"
   ],
+  "audit": {
+    // Three clone groups predate this config and are all deliberate:
+    //
+    //   resolveAliasNames  scripts/ is Node ESM shared with the API routes and
+    //                      reaches for node:fs, so the browser needs its own
+    //                      copy in src/ldraw/mpd.ts. Both say so in comments.
+    //   the brick predicate  ldraw-analyze.mjs mirrors the packer on purpose,
+    //                      as a cross-check that the two agree on what counts
+    //                      as a brick. Sharing the code would defeat it.
+    //   main().catch(...)  CLI entry-point boilerplate, nine lines of it.
+    //
+    // Baselining them keeps duplication gating on anything genuinely new,
+    // instead of firing whenever one of these files is touched. Refresh with:
+    //   pnpm exec fallow dupes --save-baseline .fallow-dupes-baseline.json
+    "dupesBaseline": ".fallow-dupes-baseline.json"
+  },
   "rules": {
     // Syntactic analysis cannot see `controllerRef.current?.setModel(...)`, so
     // SceneController's public methods look unused. Running with --type-aware

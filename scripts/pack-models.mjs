@@ -17,7 +17,11 @@ import { fetchSet } from "./lib/omr.mjs";
 
 const MODEL_EXTENSION = /\.(ldr|mpd|dat)$/i;
 
-import { buildLibraryIndex, packModel } from "./lib/ldraw-pack.mjs";
+import {
+  buildLibraryIndex,
+  localResolver,
+  packModel,
+} from "./lib/ldraw-pack.mjs";
 import { LIBRARY_DIR, PUBLIC_MODELS_DIR } from "./lib/paths.mjs";
 
 // Only models we are allowed to redistribute: the two samples that ship inside
@@ -168,6 +172,7 @@ async function main() {
     throw new Error(`${LIBRARY_DIR} is empty. Run: pnpm ldraw:setup`);
   }
   console.log(`- indexed ${index.size} library files`);
+  const resolve = localResolver(index);
 
   await mkdir(PUBLIC_MODELS_DIR, { recursive: true });
 
@@ -214,8 +219,8 @@ async function main() {
       return {
         job,
         result: await packModel({
-          index,
           name: job.omr ? `${job.omr}.mpd` : path.basename(job.source),
+          resolve,
           skipMissing,
           text,
         }),

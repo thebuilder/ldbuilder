@@ -3,9 +3,25 @@ import { ThemeProvider } from "next-themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import "./globals.css";
 
+/**
+ * Absolute base for the OpenGraph and Twitter card URLs.
+ *
+ * Vercel sets VERCEL_PROJECT_PRODUCTION_URL to the project's stable production
+ * domain on every deployment, including previews, which is what a shared card
+ * should point at. VERCEL_URL is the per-deployment URL, used when there is no
+ * production domain yet. Without either, relative image URLs would resolve
+ * against localhost and every card would 404 off this machine.
+ */
+function siteUrl(): URL {
+  const host =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  return new URL(host ? `https://${host}` : "http://localhost:3000");
+}
+
 export const metadata: Metadata = {
   description:
     "Load an LDraw model, tip the bricks onto the floor, and watch it assemble itself step by step. Explode, slice and inspect any piece.",
+  metadataBase: siteUrl(),
   // Both the twitter and openGraph cards pick up app/opengraph-image.tsx.
   openGraph: {
     description:

@@ -26,7 +26,27 @@ interface SetResponse {
  * so only a couple ship with the app and the rest are a set number away. The
  * fetch goes through /api/omr because the OMR serves no CORS headers and the
  * set still has to be packed against the parts library before it can load.
+ * That packing is what makes the first open of a set slow, hence the note the
+ * card shows while it works.
  */
+/** The line under the field: the licence note, progress, or what went wrong. */
+function StatusNote({ status }: { status: Status }) {
+  if (status.kind === "error") {
+    return (
+      <p className="readout border-danger border-t pt-3 text-ink">
+        {status.message}
+      </p>
+    );
+  }
+  return (
+    <p className="readout border-edge border-t pt-3 text-faint">
+      {status.kind === "working"
+        ? "Fetching every part this set uses. The first time a set is opened takes a few seconds; after that it is immediate."
+        : "Redistributable under CC BY 2.0, credited to whoever built it."}
+    </p>
+  );
+}
+
 export function OpenSetCard({ className = "" }: { className?: string }) {
   const router = useRouter();
   const [value, setValue] = useState("");
@@ -100,15 +120,7 @@ export function OpenSetCard({ className = "" }: { className?: string }) {
           </div>
         </div>
 
-        {status.kind === "error" ? (
-          <p className="readout border-danger border-t pt-3 text-ink">
-            {status.message}
-          </p>
-        ) : (
-          <p className="readout border-edge border-t pt-3 text-faint">
-            Redistributable under CC BY 2.0, credited to whoever built it.
-          </p>
-        )}
+        <StatusNote status={status} />
       </form>
     </div>
   );
