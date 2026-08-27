@@ -10,6 +10,23 @@
   // Captured third-party markup, kept verbatim so the parser is tested against
   // the real thing. Nothing in it is ours to lint.
   "ignorePatterns": ["scripts/lib/__fixtures__/**"],
+  "audit": {
+    // Three clone groups predate this config and are all deliberate:
+    //
+    //   resolveAliasNames  scripts/ is Node ESM shared with the API routes and
+    //                      reaches for node:fs, so the browser needs its own
+    //                      copy in src/ldraw/mpd.ts. Both say so in comments.
+    //   the brick predicate  ldraw-analyze.mjs mirrors the packer on purpose,
+    //                      as a cross-check that the two agree on what counts
+    //                      as a brick. Sharing the code would defeat it.
+    //   main().catch(...)  CLI entry-point boilerplate, nine lines of it.
+    //
+    // Unlike complexity and dead code, duplication is not attributed as new or
+    // inherited, so without this it fires whenever a pull request happens to
+    // touch one of those files. Refresh with:
+    //   pnpm exec fallow dupes --save-baseline .fallow-dupes-baseline.json
+    "dupesBaseline": ".fallow-dupes-baseline.json"
+  },
   "health": {
     // CRAP is cyclomatic² × (1 − coverage)³ + cyclomatic, so without coverage
     // it collapses to cyclomatic² + cyclomatic and the default ceiling of 30
