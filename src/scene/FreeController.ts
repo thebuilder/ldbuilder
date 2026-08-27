@@ -290,6 +290,10 @@ export class FreeController {
     }
     carried.yaw = (carried.yaw + yawSteps + 4) % 4;
     carried.tip = (carried.tip + tipSteps + 4) % 4;
+    // Work out where that leaves it before saying anything: reporting first
+    // describes the pose before the turn, so the HUD is a move behind and
+    // "will not fit" arrives once you have already fixed it.
+    this.resolveSnap(carried);
     this.report();
   }
 
@@ -302,6 +306,7 @@ export class FreeController {
     carried.nudge.x += x;
     carried.nudge.y += y;
     carried.nudge.z += z;
+    this.resolveSnap(carried);
     this.report();
   }
 

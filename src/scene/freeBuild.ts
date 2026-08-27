@@ -167,44 +167,122 @@ export function snapPlacement(input: SnapInput, target: Vector3): SnapResult {
 
   // The footprint is known before the height is, which is what lets the height
   // be read off whatever that footprint covers.
-  const minX = centerX - half.x + TOUCH_EPSILON;
-  const maxX = centerX + half.x - TOUCH_EPSILON;
-  const minZ = centerZ - half.z + TOUCH_EPSILON;
-  const maxZ = centerZ + half.z - TOUCH_EPSILON;
+  const surfaces = surfacesUnder(built, floorY, {
+    maxX: centerX + half.x - TOUCH_EPSILON,
+    maxZ: centerZ + half.z - TOUCH_EPSILON,
+    minX: centerX - half.x + TOUCH_EPSILON,
+    minZ: centerZ - half.z + TOUCH_EPSILON,
+  });
 
-  let rest = floorY;
-  let restingOn: number | null = null;
-  for (const [id, box] of built) {
-    if (box.max.x <= minX || box.min.x >= maxX) {
-      continue;
-    }
-    if (box.max.z <= minZ || box.min.z >= maxZ) {
-      continue;
-    }
-    if (box.max.y > rest) {
-      rest = box.max.y;
-      restingOn = id;
+  // Nearest to where the pointer actually is, rather than the highest. The ray
+  // lands on the face somebody is pointing at, so pointing at the top of a
+  // brick halfway up a stack means that brick, not the top of the stack: it is
+  // the difference between building on something and only ever building upward.
+  surfaces.sort(
+    (a, b) => Math.abs(a.y - desired.y) - Math.abs(b.y - desired.y)
+  );
+
+  // A height set by hand is a decision, so it is placed where it was asked for
+  // and reported as not fitting if it does not. Otherwise take the nearest
+  // surface the part actually fits on.
+  const search = nudge.y === 0 ? surfaces : surfaces.slice(0, 1);
+  const [nearest] = surfaces;
+  let chosen = nearest;
+  let blocked = true;
+
+  for (const surface of search) {
+    place(target, surface.y, centerX, centerZ, half, center, nudge);
+    if (!collides(target, half, center, built)) {
+      chosen = surface;
+      blocked = false;
+      break;
     }
   }
+  if (blocked) {
+    place(target, chosen.y, centerX, centerZ, half, center, nudge);
+  }
 
+  return { blocked, position: target, restingOn: chosen.on };
+}
+
+interface Footprint {
+  maxX: number;
+  maxZ: number;
+  minX: number;
+  minZ: number;
+}
+
+interface Surface {
+  /** The placement this surface belongs to, or null for the floor. */
+  on: number | null;
+  y: number;
+}
+
+/**
+ * Every height a part could come to rest at under this footprint.
+ *
+ * One per distinct surface, because a wall of bricks all at the same level is
+ * one place to put something down rather than twenty.
+ */
+function surfacesUnder(
+  built: Map<number, Box3>,
+  floorY: number,
+  footprint: Footprint
+): Surface[] {
+  const surfaces: Surface[] = [{ on: null, y: floorY }];
+
+  for (const [id, box] of built) {
+    if (box.max.x <= footprint.minX || box.min.x >= footprint.maxX) {
+      continue;
+    }
+    if (box.max.z <= footprint.minZ || box.min.z >= footprint.maxZ) {
+      continue;
+    }
+    if (
+      surfaces.some(
+        (surface) => Math.abs(surface.y - box.max.y) < TOUCH_EPSILON
+      )
+    ) {
+      continue;
+    }
+    surfaces.push({ on: id, y: box.max.y });
+  }
+  return surfaces;
+}
+
+function place(
+  target: Vector3,
+  rest: number,
+  centerX: number,
+  centerZ: number,
+  half: Vector3,
+  center: Vector3,
+  nudge: { x: number; y: number; z: number }
+): void {
   target.set(
     centerX - center.x,
     rest + half.y - center.y + nudge.y * PLATE,
     centerZ - center.z
   );
+}
 
-  // Resting leaves the two boxes sharing a face, which `overlaps` does not
-  // count, so the part it is standing on needs no special case here.
-  boxFor(target, half, center, scratchBox);
-  let blocked = false;
+/**
+ * Resting leaves the two boxes sharing a face, which `overlaps` does not count,
+ * so the part being stood on needs no special case here.
+ */
+function collides(
+  position: Vector3,
+  half: Vector3,
+  center: Vector3,
+  built: Map<number, Box3>
+): boolean {
+  boxFor(position, half, center, scratchBox);
   for (const [, box] of built) {
     if (overlaps(scratchBox, box)) {
-      blocked = true;
-      break;
+      return true;
     }
   }
-
-  return { blocked, position: target, restingOn };
+  return false;
 }
 
 function overlaps(a: Box3, b: Box3): boolean {
