@@ -1,0 +1,77 @@
+# Everything that has to hold before a change lands.
+#
+# One job rather than several: install dominates the wall clock here, the suite
+# runs in two seconds and the build in under twenty, so paying for one install
+# and running the checks in sequence beats fanning out.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  # A newer push to the same branch supersedes this run.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # fallow decides whether a finding is new or inherited by diffing
+          # against the merge base, which it cannot do from a shallow clone.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version-file: .nvmrc
+
+      - run: pnpm install --frozen-lockfile
+
+      # The steps below use `!cancelled()` rather than stopping at the first
+      # failure. A run that reports only "lint failed" costs another round trip
+      # to discover the tests were broken too.
+      - name: Lint and format
+        run: pnpm check
+
+      - name: Types
+        if: ${{ !cancelled() }}
+        run: pnpm typecheck
+
+      - name: Tests
+        if: ${{ !cancelled() }}
+        run: pnpm test:coverage
+
+      # Dead code, complexity and duplication in what this change touched.
+      #
+      # Advisory for now, and deliberately so. fallow gates on findings a
+      # changeset introduces, judged against its base. Until this branch is in
+      # main, its base is a repo with almost nothing in it, so the entire
+      # codebase reads as introduced and the gate would fail on 46 findings that
+      # are simply the project existing. Once this is merged, a PR's base is a
+      # populated main and the count means what it says.
+      #
+      # Flip it then: drop continue-on-error. `pnpm audit` already gates this
+      # way locally, against the last commit rather than against main.
+      - name: Audit
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          # Attribute against the branch being merged into, not origin/HEAD.
+          FALLOW_AUDIT_BASE: ${{ github.base_ref && format('origin/{0}', github.base_ref) || '' }}
+        # Reads the coverage the previous step wrote, which is why this calls
+        # fallow directly rather than through the audit script.
+        run: pnpm exec fallow audit
+
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: pnpm build

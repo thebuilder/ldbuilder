@@ -186,6 +186,20 @@ the model.
 `coverage-final.json` to score CRAP. Without it that metric just measures the
 absence of tests.
 
+## CI
+
+[CI](.github/workflows/ci.yml) runs lint, types, tests and the build on every
+pull request, and on pushes to main. The checks use `!cancelled()` rather than
+stopping at the first failure, so one run tells you everything that is broken.
+
+fallow runs there too, but advisory for now. It gates on findings a changeset
+*introduces*, judged against its base, and until this work is in main its base
+is a repo with almost nothing in it, so the whole codebase reads as introduced.
+Once merged, a PR's base is a populated main and the number means what it says;
+dropping `continue-on-error` from that step is all it takes. `pnpm audit`
+already gates this way locally, against the last commit rather than against
+main.
+
 ## How it works
 
 **Flattening.** The loader hands back a nested group tree. That does not work
