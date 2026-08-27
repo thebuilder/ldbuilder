@@ -11,19 +11,27 @@ export default defineConfig({
       // coverage-final.json is Istanbul-shaped, which is what fallow's
       // health.coverage wants so its CRAP scores mean something.
       exclude: [
-        "**/*.test.{ts,mjs}",
+        "**/*.test.{ts,mjs,tsx}",
+        "src/test/**",
         "**/__fixtures__/**",
         // Generated from LDConfig.ldr: a 400-entry lookup table, not logic.
         "src/ldraw/colors.generated.ts",
       ],
-      include: ["scripts/lib/**/*.mjs", "src/ldraw/**/*.ts", "src/lib/**/*.ts"],
+      include: [
+        "scripts/lib/**/*.mjs",
+        "src/components/**/*.tsx",
+        "src/ldraw/**/*.ts",
+        "src/lib/**/*.ts",
+      ],
       provider: "v8",
       reporter: ["text-summary", "json"],
       reportsDirectory: "coverage",
     },
-    // Everything under test is pure: string and array work, plus a fake fetch.
-    // Nothing here needs a DOM, and pulling one in would only slow the suite.
+    // Node by default: most of what is tested here is string and array work
+    // plus a fake fetch, and a DOM would only slow it down. Component suites
+    // opt in with a `@vitest-environment happy-dom` docblock.
     environment: "node",
-    include: ["{src,scripts}/**/*.test.{ts,mjs}"],
+    include: ["{src,scripts}/**/*.test.{ts,mjs,tsx}"],
+    setupFiles: ["src/test/setup.ts"],
   },
 });

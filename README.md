@@ -165,16 +165,24 @@ that does have the library installed.
 ## Tests
 
 ```bash
-pnpm test              # 165 tests, about two seconds
+pnpm test              # 198 tests, about two seconds
 pnpm test:watch
 pnpm test:coverage     # writes coverage/coverage-final.json
 ```
 
-They cover the pure logic: the packer's reference-naming rules, the network
-resolver's fallback chain and caching, step synthesis, bag partitioning, the
-search ranking, and the OMR scrapers. That is where the bugs have actually been,
-and it is testable without a GPU. The rendering path (`flatten`, `layout`,
-`loadModel`, `SceneController`) needs a real scene and is not covered here.
+Most run on node and cover pure logic: the packer's reference-naming rules, the
+network resolver's fallback chain and caching, step synthesis, bag partitioning,
+the search ranking, and the OMR scrapers. That is where the bugs have actually
+been, and it is testable without a GPU.
+
+The set field is the exception: it renders under happy-dom, because keyboard
+navigation through a listbox is behaviour rather than a function, and
+`aria-activedescendant` pointing at the wrong row is not something a unit test
+of the search would catch. Suites opt into a DOM with a
+`@vitest-environment happy-dom` docblock; the rest stay on node and stay fast.
+
+The rendering path (`flatten`, `layout`, `loadModel`, `SceneController`) needs a
+real scene and is not covered.
 
 One suite checks the committed models rather than the code: every `.mpd` in
 `public/models` must be self-contained and must still match the brick, step and
@@ -192,13 +200,9 @@ absence of tests.
 pull request, and on pushes to main. The checks use `!cancelled()` rather than
 stopping at the first failure, so one run tells you everything that is broken.
 
-fallow runs there too, but advisory for now. It gates on findings a changeset
-*introduces*, judged against its base, and until this work is in main its base
-is a repo with almost nothing in it, so the whole codebase reads as introduced.
-Once merged, a PR's base is a populated main and the number means what it says;
-dropping `continue-on-error` from that step is all it takes. `pnpm audit`
-already gates this way locally, against the last commit rather than against
-main.
+fallow gates there too, on what a change *introduces* rather than what it
+inherits. `pnpm audit` runs the same check locally, against the last commit
+rather than against main.
 
 ## How it works
 
