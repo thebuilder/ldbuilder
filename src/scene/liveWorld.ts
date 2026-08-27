@@ -7,7 +7,7 @@ import {
   BRICK_FRICTION,
   BRICK_RESTITUTION,
   getPhysics,
-  gravityFor,
+  HANDLING_GRAVITY,
   type Rapier,
 } from "./physics";
 
@@ -47,8 +47,20 @@ const STRAY_CHECK_FRAMES = 30;
  */
 const STRAY_FACTOR = 1.2;
 
-/** Held bricks stop dead when released unless the throw is deliberate. */
-const THROW_SCALE = 0.85;
+/**
+ * How much of the hand's speed a released brick keeps.
+ *
+ * A little over one, because the tracked speed is a smoothed average and a
+ * flick is over before the average catches up with it: the compensation is for
+ * the measurement, not a thumb on the scale.
+ */
+const THROW_SCALE = 1.3;
+
+/** Nothing leaves the hand faster than this, in LDraw units per second. */
+const MAX_THROW_SPEED = 4000;
+
+/** A thrown brick tumbles; the faster it goes the more it turns. */
+const THROW_SPIN = 0.012;
 
 /** Smoothing on the tracked hand velocity, per second. */
 const VELOCITY_LAMBDA = 22;
@@ -97,8 +109,7 @@ export class LiveWorld {
     this.unit = unit;
     this.centre.copy(centre);
 
-    const gravity = gravityFor(unit);
-    this.world = new rapier.World({ x: 0, y: -gravity, z: 0 });
+    this.world = new rapier.World({ x: 0, y: -HANDLING_GRAVITY, z: 0 });
     this.world.timestep = FIXED_DT;
     // Rapier's thresholds assume a world measured in metres, and LDraw units
     // are 0.4mm. Without this the solver clamps falling bricks to a constant
@@ -222,6 +233,18 @@ export class LiveWorld {
   /** Put a brick back exactly where a saved game left it, at rest. */
   restore(brick: Brick, position: Vector3, quaternion: Quaternion): void {
     this.spawn(brick, { position, quaternion });
+  }
+
+  /** Let a brick go from outside the world, carrying the speed it was moving at. */
+  drop(brick: Brick, velocity: Vector3): void {
+    this.spawn(brick, {
+      position: brick.object.position,
+      quaternion: brick.object.quaternion,
+    });
+    const body = this.bodies.get(brick.id);
+    if (body) {
+      this.throwBody(body, velocity);
+    }
   }
 
   /** Drop a loose brick's body: it has either been placed or been reset away. */
@@ -348,9 +371,29 @@ export class LiveWorld {
     }
     body.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
     body.enableCcd(false);
-    this.scratch.copy(held.velocity).multiplyScalar(THROW_SCALE);
+    this.throwBody(body, held.velocity);
+  }
+
+  /**
+   * Hand a body the speed it was let go at.
+   *
+   * Capped, because a pointer that jumps across the screen in one frame reports
+   * a speed no arm could produce, and a brick that leaves at that speed is gone.
+   */
+  private throwBody(body: RigidBody, velocity: Vector3): void {
+    this.scratch.copy(velocity).multiplyScalar(THROW_SCALE);
+    if (this.scratch.length() > MAX_THROW_SPEED) {
+      this.scratch.setLength(MAX_THROW_SPEED);
+    }
     body.setLinvel(this.scratch, true);
-    body.setAngvel(ZERO, true);
+    body.setAngvel(
+      {
+        x: this.scratch.z * THROW_SPIN,
+        y: 0,
+        z: -this.scratch.x * THROW_SPIN,
+      },
+      true
+    );
   }
 
   step(dt: number): void {

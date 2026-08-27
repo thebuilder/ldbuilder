@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { Vector3 } from "three";
 import {
   afterEach,
   beforeAll,
@@ -107,6 +108,30 @@ const pointer = (
     clientY: y,
     pointerId: 1,
   });
+
+/**
+ * Move the pointer across the floor a frame at a time, without stopping.
+ *
+ * The frames have to be interleaved with the moves, or the hand jumped once and
+ * then held still, which is the opposite of a throw. And the loop has to stay
+ * running across the whole swing: the first frame after a start has no previous
+ * frame to measure against, so restarting it per move means every frame is a
+ * first frame and nothing ever appears to move at all.
+ */
+async function swing(): Promise<void> {
+  controller.start();
+  await [1, 2, 3, 4, 5, 6, 7, 8].reduce(
+    (previous, step) =>
+      previous.then(() => {
+        canvas.dispatchEvent(
+          pointer("pointermove", VIEWPORT.width / 2 + step * 30)
+        );
+        return frames(2);
+      }),
+    Promise.resolve()
+  );
+  controller.stop();
+}
 
 async function run(count = 3): Promise<void> {
   controller.start();
@@ -307,6 +332,41 @@ describe("FreeController", () => {
 
     // It came off the floor, so that is where it goes back to.
     expect(latest()?.loose).toBe(1);
+  });
+
+  it("hands a dropped part the speed it was moving at", async () => {
+    await open();
+    const { world } = controller as unknown as {
+      world: { drop: (brick: unknown, velocity: Vector3) => void };
+    };
+    const drop = vi.spyOn(world, "drop");
+
+    controller.pourOut("3001.dat", RED, 1);
+    await run();
+    canvas.dispatchEvent(pointer("pointerdown"));
+    await swing();
+    controller.cancelCarry();
+
+    // How far it then travels is the world's business, and is tested there.
+    // What has to be true here is that the swing reaches it at all.
+    expect(drop).toHaveBeenCalledOnce();
+    expect(drop.mock.calls[0][1].length()).toBeGreaterThan(1);
+  });
+
+  it("drops a part that was standing still without throwing it", async () => {
+    await open();
+    const { world } = controller as unknown as {
+      world: { drop: (brick: unknown, velocity: Vector3) => void };
+    };
+    const drop = vi.spyOn(world, "drop");
+
+    controller.pourOut("3001.dat", RED, 1);
+    await run();
+    canvas.dispatchEvent(pointer("pointerdown"));
+    await run(12);
+    controller.cancelCarry();
+
+    expect(drop.mock.calls[0][1].length()).toBeLessThan(1);
   });
 
   it("throws away a part taken from the box when it is cancelled", async () => {

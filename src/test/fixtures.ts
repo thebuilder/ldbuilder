@@ -26,6 +26,8 @@ import type { Brick, ModelData, Pose } from "@/ldraw/types";
  * geometry maths honest. */
 const STUD = 20;
 const BRICK_HEIGHT = 24;
+/** How far a stud stands above the plane a part's origin sits on. */
+const STUD_HEIGHT = 4;
 
 export interface BrickSpec {
   /** Where it sits in the finished model, in LDraw units. */
@@ -198,10 +200,13 @@ export function makePalette(specs: PaletteSpec[]): Palette {
     const depth = studsZ * STUD;
 
     // A palette template is raw LDraw geometry: unposed, and still in the frame
-    // where Y points down. A part's origin is its stud face, so its body hangs
-    // below the origin in those coordinates, which is above it once stood up.
-    const geometry = new BoxGeometry(width, BRICK_HEIGHT, depth);
-    geometry.translate(0, BRICK_HEIGHT / 2, 0);
+    // where Y points down. A part's origin is its stud plane, so the body runs
+    // from there to positive local Y, and the studs stand proud at negative
+    // local Y. Modelling the studs matters: a part that rests on the bounding
+    // box rather than on the body sits a stud's height clear of what is under
+    // it, and a fixture without studs cannot catch that.
+    const geometry = new BoxGeometry(width, BRICK_HEIGHT + STUD_HEIGHT, depth);
+    geometry.translate(0, (BRICK_HEIGHT - STUD_HEIGHT) / 2, 0);
     geometry.computeBoundingBox();
 
     const template = new Object3D();
@@ -212,12 +217,18 @@ export function makePalette(specs: PaletteSpec[]): Palette {
     const part: PalettePart = {
       file: spec.file ?? `${3000 + index}.dat`,
       group: spec.group ?? "brick",
-      halfExtents: new Vector3(width / 2, BRICK_HEIGHT / 2, depth / 2),
-      localCenter: new Vector3(0, BRICK_HEIGHT / 2, 0),
+      halfExtents: new Vector3(
+        width / 2,
+        (BRICK_HEIGHT + STUD_HEIGHT) / 2,
+        depth / 2
+      ),
+      localCenter: new Vector3(0, (BRICK_HEIGHT - STUD_HEIGHT) / 2, 0),
       meshes: [mesh],
       name: spec.partFile ?? `Part ${index}`,
       radius: Math.hypot(width, BRICK_HEIGHT, depth) / 2,
       size: spec.size ?? [1, 1],
+      solidCenter: new Vector3(0, BRICK_HEIGHT / 2, 0),
+      solidHalfExtents: new Vector3(width / 2, BRICK_HEIGHT / 2, depth / 2),
       template,
     };
     byFile.set(part.file.toLowerCase(), part);

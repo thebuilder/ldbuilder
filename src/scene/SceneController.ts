@@ -65,8 +65,14 @@ const CARRY_WHEEL_STEP = 8;
 /** Two presses on the same brick inside this many ms send it home by itself. */
 const ASSIST_DOUBLE_MS = 350;
 
-/** Solver steps run with nothing drawn, when a pour is not going to be watched. */
-const REDUCED_MOTION_SETTLE_STEPS = 150;
+/**
+ * Solver steps run with nothing drawn, when a pour is not going to be watched.
+ *
+ * Enough for the tallest release to land and the pile under it to stop moving.
+ * Gravity here is tuned for handling bricks rather than for watching them fall,
+ * so a bag takes a couple of seconds of simulated time to come down.
+ */
+const REDUCED_MOTION_SETTLE_STEPS = 260;
 
 /** How long a placed brick stays lit, in seconds. */
 const PLACE_FLASH_SECONDS = 0.35;

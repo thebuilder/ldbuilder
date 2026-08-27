@@ -60,6 +60,7 @@ beforeEach(() => {
     configurable: true,
     value: new MemoryStorage(),
   });
+  report = null;
   palette.error = null;
   palette.value = makePalette([
     { file: "3001.dat", partFile: "Brick 2 x 4", size: [2, 4] },
@@ -77,6 +78,8 @@ afterEach(() => {
 const open = async () => {
   render(<FreeBuildClient />);
   await screen.findByText("Free build");
+  // The stage hands its reporter up during render; nothing may use it before.
+  await waitFor(() => expect(report).not.toBeNull());
 };
 
 describe("FreeBuildClient", () => {
