@@ -26,7 +26,10 @@
       "!src/ldraw/colors.generated.ts",
       "!ldraw-library",
       "!demo-models",
-      "!public/models"
+      "!public/models",
+      // Generated: reformatting them only creates churn on the next regenerate.
+      "!public/omr-index.json",
+      "!.fallow-dupes-baseline.json"
     ]
   }
 }

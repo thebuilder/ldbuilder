@@ -11,6 +11,7 @@
     "fix": "ultracite fix",
     "ldraw:colors": "node scripts/gen-colors.mjs",
     "ldraw:demos": "node scripts/make-demos.mjs",
+    "ldraw:index": "node scripts/fetch-omr-index.mjs",
     "ldraw:omr": "node scripts/fetch-omr.mjs",
     "ldraw:pack": "node scripts/pack-models.mjs",
     "ldraw:setup": "node scripts/setup-ldraw.mjs",

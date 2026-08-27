@@ -320,11 +320,6 @@ async function resolveDependencies(state) {
  * their own dependencies: a submodel references parts like anything else. A
  * plain .ldr is simply its own root.
  */
-// Breaches on CRAP, which is a coverage proxy rather than a complexity one:
-// cyclomatic 5 and cognitive 6 are well inside the limits, and 30 is simply what
-// an untested function with five branches scores. Splitting it further would
-// scatter one coherent setup step across three names to satisfy an arithmetic.
-// fallow-ignore-next-line complexity
 function seed(text, rootName) {
   const embedded = extractEmbedded(text);
   const bodies = new Map();

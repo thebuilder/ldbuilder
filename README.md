@@ -55,6 +55,7 @@ pnpm ldraw:setup     # download + extract the parts library (138 MB, gitignored)
 pnpm ldraw:colors    # LDConfig.ldr -> src/ldraw/colors.generated.ts
 pnpm ldraw:pack      # pack the curated models into public/models
 pnpm ldraw:demos     # regenerate the two generated demo models
+pnpm ldraw:index     # rescrape the searchable OMR set list
 
 pnpm ldraw:pack path/to/some-set.ldr    # add one more to the gallery
 pnpm ldraw:pack x.ldr --skip-missing    # build it without the parts it is missing
@@ -96,10 +97,17 @@ elsewhere carry no stated licence, so none are redistributed in this repo.
 `scripts/lib/omr.mjs` reads the licence header and refuses anything without it,
 and lifts the author and theme out for the gallery card.
 
-Only two sets ship with the app. The rest are a set number away: the gallery has
-an **Open an official set** card, which goes through `/api/omr/[set]` because the
-OMR serves no CORS headers and the set still has to be packed on the way
-through.
+Only two sets ship with the app. The rest are a search away: the gallery has an
+**Open an official set** card that finds sets by number, name or theme, and
+opens one through `/api/omr/[set]`, which proxies the OMR (it serves no CORS
+headers) and packs the set on the way through.
+
+The search runs against `public/omr-index.json`: 1,470 sets with name, theme and
+year, 75 KB, fetched on first interaction rather than with the page. The OMR has
+no API and no directory listing, so `pnpm ldraw:index` scrapes the 59 pages of
+its set list and commits the result. Re-run it when the OMR gains sets worth
+finding by name; a set number typed in full opens whether or not the index knows
+about it.
 
 ### Bringing your own
 
