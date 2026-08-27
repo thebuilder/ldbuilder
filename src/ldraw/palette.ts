@@ -11,6 +11,7 @@ import { LDrawLoader } from "three/addons/loaders/LDrawLoader.js";
 import { LDrawConditionalLineMaterial } from "three/addons/materials/LDrawConditionalLineMaterial.js";
 import { isLineSegments, isMesh } from "@/scene/three-guards";
 import { flattenModel } from "./flatten";
+import { stopwatch, yieldToBrowser } from "./loading";
 import type { Brick, Pose } from "./types";
 
 /**
@@ -36,6 +37,19 @@ const LDCONFIG_URL = "/ldraw/LDConfig.ldr";
 /** LDraw's own codes for "the colour I was given" and its edge. */
 const INHERITED_SURFACE = "16";
 const INHERITED_EDGE = "24";
+
+/**
+ * Vertex normals are left flat here, unlike a model, where small ones are
+ * smoothed.
+ *
+ * Smoothing costs about 55ms per distinct part and the palette is 194 of them,
+ * all distinct by construction: it took the parse from 411ms to 10.8 seconds,
+ * spent frozen on a loading card that could not repaint. What it buys is
+ * softer shading across the flutes of a cylinder and the rim of a stud, which
+ * at building distance is a difference you have to go looking for. Twenty-two
+ * times the wait is not a price worth paying for it.
+ */
+const SMOOTH_NORMALS = false;
 
 export interface PalettePart {
   /** `3001.dat`. */
@@ -99,10 +113,13 @@ interface EdgeMaterialCache {
 
 export async function loadPalette(): Promise<Palette> {
   Cache.enabled = true;
+  const timer = stopwatch();
 
   const loader = new LDrawLoader();
   loader.setConditionalLineMaterial(LDrawConditionalLineMaterial);
+  loader.smoothNormals = SMOOTH_NORMALS;
   await loader.preloadMaterials(LDCONFIG_URL);
+  timer.mark("colours");
 
   const [catalogueResponse, mpdResponse] = await Promise.all([
     fetch(PALETTE_JSON),
@@ -115,14 +132,21 @@ export async function loadPalette(): Promise<Palette> {
   }
   const catalogue = (await catalogueResponse.json()) as Catalogue;
   const source = await mpdResponse.text();
+  timer.mark("fetch");
+
+  // The parse cannot be split, so the last chance the loading card gets to
+  // paint is here, before it.
+  await yieldToBrowser();
 
   const raw = await new Promise<Group>((resolve, reject) => {
     loader.parse(source, resolve, reject);
   });
+  timer.mark("parse");
 
   // The palette is one model whose every reference is a part, so flattening it
   // hands back exactly one brick per palette entry, already measured.
   const { bricks } = flattenModel(raw, {});
+  timer.mark("flatten");
   const byFile = new Map<string, PalettePart>();
   for (const brick of bricks) {
     const template = brick.object;
@@ -177,6 +201,9 @@ export async function loadPalette(): Promise<Palette> {
       surface,
     };
   };
+
+  timer.mark("index");
+  timer.log("palette");
 
   return { byFile, groups, materials };
 }

@@ -4,6 +4,7 @@ import { LDrawConditionalLineMaterial } from "three/addons/materials/LDrawCondit
 import { computeBags } from "./bags";
 import { buildBom, flattenModel } from "./flatten";
 import { layoutAllBags } from "./layout";
+import { stopwatch, yieldToBrowser } from "./loading";
 import { computeSteps } from "./steps";
 import type { LoadProgress, ModelData } from "./types";
 
@@ -15,15 +16,16 @@ const MPD_EXTENSION = /\.mpd$/i;
 /**
  * Above this many bricks, vertex normals are left flat.
  *
- * Smoothing is by far the most expensive part of parsing: measured on a
- * 4200-brick set it accounts for roughly four fifths of a 15 second parse, and
- * on the 61-brick sample it is 82ms of 130ms. Curved surfaces (studs, cylinders,
- * tyres) look faceted without it, which is a real loss on a small model where
- * you are looking closely, and a negligible one on a large model you are mostly
- * seeing from a distance. Trading it away past this threshold is what keeps big
- * sets openable at all.
+ * Smoothing is by far the most expensive part of parsing, and the parse is one
+ * synchronous block: whatever it costs is time the page is frozen with a
+ * loading card on it that cannot even repaint. Measured on the bundled models,
+ * everything up to the 128-brick set parses in about 100ms, while the 368-brick
+ * one costs 3.6s, of which 3.4s is smoothing. Curved surfaces (studs,
+ * cylinders, tyres) look faceted without it, which is a real loss on a small
+ * model you are looking closely at, and one worth taking the moment the wait
+ * becomes long enough to read as the page having hung.
  */
-const SMOOTH_NORMALS_MAX_BRICKS = 800;
+const SMOOTH_NORMALS_MAX_BRICKS = 200;
 
 /** Cheap upper bound on brick count: every part reference is a type-1 line. */
 function countReferences(text: string): number {
@@ -40,52 +42,6 @@ function countReferences(text: string): number {
 // switching between models does not refetch. Keyed by URL, so blob URLs from
 // uploads stay distinct.
 Cache.enabled = true;
-
-/**
- * Phase timings. Loading a large model is the slowest thing the app does, and
- * without these it is guesswork which phase is responsible.
- */
-function stopwatch() {
-  const marks: [string, number][] = [];
-  let last = performance.now();
-  return {
-    log(slug: string) {
-      if (process.env.NODE_ENV === "production") {
-        return;
-      }
-      const total = marks.reduce((sum, [, ms]) => sum + ms, 0);
-      console.info(
-        `[ldraw] ${slug} loaded in ${total.toFixed(0)}ms:`,
-        marks.map(([name, ms]) => `${name} ${ms.toFixed(0)}ms`).join(", ")
-      );
-    },
-    mark(name: string) {
-      const now = performance.now();
-      marks.push([name, now - last]);
-      last = now;
-    },
-  };
-}
-
-interface SchedulerWithYield {
-  yield?: () => Promise<void>;
-}
-
-/**
- * Hand control back to the event loop so the progress UI can update between
- * phases. The parse itself is one synchronous block and cannot be split.
- *
- * Not requestAnimationFrame. Browsers throttle rAF to a crawl, or stop it, when
- * the tab is hidden or otherwise not painting, which turned a 250ms load into an
- * eight second one. `scheduler.yield` and `setTimeout` run either way.
- */
-function yieldToBrowser(): Promise<void> {
-  const { scheduler } = globalThis as { scheduler?: SchedulerWithYield };
-  if (typeof scheduler?.yield === "function") {
-    return scheduler.yield();
-  }
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
 
 export interface LoadModelOptions {
   /** Brick count from the manifest, used to sanity-check the flatten pass. */
