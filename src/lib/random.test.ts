@@ -51,7 +51,6 @@ describe("hashString", () => {
       "gatehouse",
       "pyramid",
       "saturn-v",
-      "wall",
     ];
 
     expect(new Set(slugs.map(hashString)).size).toBe(slugs.length);

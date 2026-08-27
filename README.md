@@ -67,7 +67,7 @@ pnpm ldraw:setup     # download + extract the parts library (138 MB, gitignored)
 pnpm ldraw:colors    # LDConfig.ldr -> src/ldraw/colors.generated.ts
 pnpm ldraw:pack      # pack the curated models into public/models
 pnpm ldraw:palette   # pack the free-build parts into public/parts
-pnpm ldraw:demos     # regenerate the two generated demo models
+pnpm ldraw:demos     # regenerate the generated demo model, checking it is buildable
 pnpm ldraw:index     # rescrape the searchable OMR set list
 
 pnpm ldraw:pack path/to/some-set.ldr    # add one more to the gallery
@@ -83,15 +83,14 @@ a mismatch between the two is caught rather than silently losing parts.
 | Model | Bricks | Steps | What it covers |
 | --- | --- | --- | --- |
 | Example Pyramid | 13 | 4 | The smallest thing with a real build order |
-| Running Bond Wall | 38 | 1 | No `0 STEP` metas, so the order is inferred |
 | Example Car | 61 | 8 | Authored steps, 26 different parts |
 | Gatehouse | 128 | 24 | Submodels: four towers and a span |
 | 928 Galaxy Explorer | 368 | 53 | A real set, 53 steps as its author wrote them |
 | 21309 NASA Apollo Saturn V | 1,845 | 775 | 30 bags, deep submodels, the scale case |
 
-The two examples ship inside the LDraw library. The wall and gatehouse are
-generated from library parts by `scripts/make-demos.mjs`, to cover cases the
-library samples do not. The two official sets come from the OMR, below.
+The two examples ship inside the LDraw library. The gatehouse is generated from
+library parts by `scripts/make-demos.mjs`, to cover the case the library samples
+do not, which is a model made of submodels. The two official sets come from the OMR, below.
 
 ### Official sets, and why they can ship here
 
