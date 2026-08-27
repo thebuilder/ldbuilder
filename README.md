@@ -103,11 +103,20 @@ opens one through `/api/omr/[set]`, which proxies the OMR (it serves no CORS
 headers) and packs the set on the way through.
 
 The search runs against `public/omr-index.json`: 1,470 sets with name, theme and
-year, 75 KB, fetched on first interaction rather than with the page. The OMR has
-no API and no directory listing, so `pnpm ldraw:index` scrapes the 59 pages of
-its set list and commits the result. Re-run it when the OMR gains sets worth
-finding by name; a set number typed in full opens whether or not the index knows
-about it.
+year, 19 KB over the wire, fetched on first interaction rather than with the
+page. The OMR has no API and no directory listing, so `pnpm ldraw:index` scrapes
+the 59 pages of its set list and commits the result.
+
+A [monthly workflow](.github/workflows/refresh-omr-index.yml) re-runs the scrape
+and commits when the data has actually changed, which Vercel then deploys like
+any other push. The file carries no timestamp and is written one set per line,
+so an unchanged list produces an identical file and a changed one produces a
+diff that reads as "these sets were added". A Vercel cron cannot do this job:
+it triggers a request into the deployment, whose filesystem is read-only, so
+there would be nowhere to put the result.
+
+A set number typed in full opens whether or not the index knows about it, so
+nothing breaks if it does go stale.
 
 ### Bringing your own
 
@@ -156,7 +165,7 @@ that does have the library installed.
 ## Tests
 
 ```bash
-pnpm test              # 157 tests, about two seconds
+pnpm test              # 165 tests, about two seconds
 pnpm test:watch
 pnpm test:coverage     # writes coverage/coverage-final.json
 ```

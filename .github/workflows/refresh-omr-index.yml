@@ -1,0 +1,78 @@
+# Keep the searchable set index current.
+#
+# public/omr-index.json is scraped from the OMR and committed, because the app
+# needs it as a static asset and the OMR has no API to query live. That makes it
+# the one file here that goes stale on its own: the OMR gains sets a few times a
+# year and nothing in the repo notices.
+#
+# This runs monthly and commits the file when the data has actually changed,
+# which Vercel deploys like any other push. The file carries no timestamp and is
+# written one set per line, so an unchanged list produces an identical file and
+# a changed one produces a diff that reads as "these sets were added".
+#
+# A Vercel cron cannot do this job. It triggers a request into the deployment,
+# whose filesystem is read-only, so there would be nowhere to put the result.
+name: Refresh OMR index
+
+on:
+  schedule:
+    # 04:00 UTC on the first of the month. Nothing depends on the timing: the
+    # index is a convenience, and a set number typed in full works without it.
+    - cron: "0 4 1 * *"
+  workflow_dispatch:
+
+# Least privilege: the job pushes one data file and needs nothing else.
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-omr-index
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version-file: package.json
+
+      - run: pnpm install --frozen-lockfile
+
+      # Fails loudly if it scrapes fewer sets than the list says it has, so a
+      # changed table or an error page cannot quietly produce a short index.
+      - name: Scrape the set list
+        run: pnpm ldraw:index
+
+      - name: Check whether the data changed
+        id: diff
+        run: |
+          if git diff --quiet -- public/omr-index.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No new sets."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git --no-pager diff --stat -- public/omr-index.json
+          fi
+
+      # The index ships to the browser and feeds the search field, so a
+      # malformed one is worth catching here rather than in production.
+      - name: Test
+        if: steps.diff.outputs.changed == 'true'
+        run: pnpm test
+
+      - name: Commit
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          count=$(node -p "require('./public/omr-index.json').sets.length")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/omr-index.json
+          git commit -m "Refresh the OMR set index to ${count} sets"
+          git push
