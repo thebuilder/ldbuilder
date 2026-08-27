@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { type OmrSet, searchSets } from "./omrIndex";
 
@@ -88,3 +90,67 @@ describe("searchSets", () => {
 
 const numericCompare = (a: string, b: string) =>
   a.localeCompare(b, "en", { numeric: true });
+
+/**
+ * The committed index, checked against the shape the client reads.
+ *
+ * The scraper writes tuples and `loadOmrIndex` unpacks them positionally, so
+ * the two agree by convention rather than by type. These are what would catch
+ * the convention drifting, and the file going stale in a way that matters.
+ */
+describe("the committed set index", () => {
+  const index = JSON.parse(
+    readFileSync(
+      path.join(import.meta.dirname, "../../public/omr-index.json"),
+      "utf8"
+    )
+  ) as { columns: string[]; sets: unknown[][] };
+
+  it("declares the column order loadOmrIndex unpacks", () => {
+    expect(index.columns).toEqual(["setId", "name", "theme", "year"]);
+  });
+
+  it("holds roughly the number of sets the OMR has", () => {
+    expect(index.sets.length).toBeGreaterThan(1400);
+  });
+
+  it("gives every row all four columns", () => {
+    expect(index.sets.every((row) => row.length === 4)).toBe(true);
+  });
+
+  it("gives every set an id in the OMR's number-variant form", () => {
+    const malformed = index.sets.filter(
+      ([setId]) => typeof setId !== "string" || !SET_ID.test(setId)
+    );
+
+    expect(malformed).toEqual([]);
+  });
+
+  it("names every set", () => {
+    expect(
+      index.sets.every(([, name]) => typeof name === "string" && name)
+    ).toBe(true);
+  });
+
+  it("carries no timestamp, so an unchanged scrape is an unchanged file", () => {
+    // The monthly refresh workflow commits on any diff, so a generatedAt would
+    // mean a commit every month whether or not a set was added.
+    expect(index).not.toHaveProperty("generatedAt");
+  });
+
+  it("has no duplicate set ids", () => {
+    const setIds = index.sets.map(([setId]) => setId);
+
+    expect(new Set(setIds).size).toBe(setIds.length);
+  });
+
+  it("can be searched, end to end from the real file", () => {
+    const sets = index.sets.map(
+      ([setId, name, theme, year]) => ({ name, setId, theme, year }) as OmrSet
+    );
+
+    expect(searchSets(sets, "10179").map((s) => s.setId)).toContain("10179-1");
+  });
+});
+
+const SET_ID = /^\d{2,8}-\d{1,2}$/;

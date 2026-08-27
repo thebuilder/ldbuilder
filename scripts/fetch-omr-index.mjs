@@ -18,6 +18,7 @@ import { PUBLIC_DIR } from "./lib/paths.mjs";
  * entry costs about 40KB of pure punctuation, so the shape is documented here
  * and in src/lib/omrIndex.ts instead of in every row.
  */
+const COLUMNS = ["setId", "name", "theme", "year"];
 const toRow = ({ setId, name, theme, year }) => [setId, name, theme, year];
 
 async function main() {
@@ -30,12 +31,24 @@ async function main() {
 
   sets.sort((a, b) => a.setId.localeCompare(b.setId, "en", { numeric: true }));
 
+  // One set per line, and no timestamp.
+  //
+  // Both are for the monthly refresh workflow: with a generatedAt the file
+  // changed on every run whether or not the data did, and minified it changed
+  // as one 75KB line. This way an unchanged list produces an identical file,
+  // and a changed one produces a diff that reads as "these sets were added".
+  // The whitespace costs 0.5KB gzipped.
+  const rows = sets.map((set) => `    ${JSON.stringify(toRow(set))}`);
+  const json = [
+    "{",
+    `  "columns": ${JSON.stringify(COLUMNS)},`,
+    '  "sets": [',
+    rows.join(",\n"),
+    "  ]",
+    "}",
+  ].join("\n");
+
   const file = path.join(PUBLIC_DIR, "omr-index.json");
-  const json = JSON.stringify({
-    columns: ["setId", "name", "theme", "year"],
-    generatedAt: new Date().toISOString(),
-    sets: sets.map(toRow),
-  });
   await writeFile(file, `${json}\n`);
 
   console.log(
