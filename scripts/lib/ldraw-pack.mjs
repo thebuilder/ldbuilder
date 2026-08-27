@@ -142,6 +142,42 @@ function resolveAliasNames(partNames) {
   }
 }
 
+/**
+ * How many lookups run at once by default.
+ *
+ * Reading local files is fast enough that this barely matters. It matters a lot
+ * over the network, where a set is roughly 400 lookups, so the API routes pass
+ * a higher number sized for the CDN they resolve against.
+ */
+const RESOLVE_CONCURRENCY = 24;
+
+/** Map with bounded concurrency, preserving input order in the result. */
+async function mapConcurrent(items, limit, fn) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (cursor < items.length) {
+        const index = cursor;
+        cursor += 1;
+        // biome-ignore lint/performance/noAwaitInLoops: each worker deliberately handles one item at a time; running the whole list at once is exactly what this bounds
+        results[index] = await fn(items[index]);
+      }
+    }
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+/** Resolve against a parts library on disk. Used by the CLI and in dev. */
+export function localResolver(index) {
+  return async (key) => {
+    const diskPath = index.get(key);
+    return diskPath ? await readFile(diskPath, "utf8") : null;
+  };
+}
+
 /** First plain `0 ...` line of a part file is its human description. */
 function descriptionOf(text) {
   for (const line of splitLines(text)) {
@@ -202,45 +238,111 @@ function refsIn(body) {
 }
 
 /**
- * Pack `text` and all of its dependencies into one self-contained .mpd.
+ * Drain `queue` into the set of references that still need resolving.
  *
- * @param {object} opts
- * @param {string} opts.text  Raw .ldr or .mpd source.
- * @param {string} opts.name  Name for the root model block.
- * @param {Map<string,string>} opts.index  From buildLibraryIndex().
- * @param {boolean} [opts.skipMissing]  Drop references that cannot be resolved
- *   instead of leaving them in. The rest of the model still builds; without
- *   this the caller is expected to treat `missing` as a failure.
- * @returns {Promise<{mpd:string, partNames:Record<string,string>, missing:string[], stats:object}>}
+ * Each key is marked scanned as it is claimed, so a part referenced from twenty
+ * places is only ever resolved once.
  */
-export async function packModel({ text, name, index, skipMissing = false }) {
+function takeBatch(queue, scanned, bodies) {
+  const batch = [];
+  for (const ref of queue) {
+    const key = ref.toLowerCase();
+    if (!(scanned.has(key) || bodies.has(key))) {
+      scanned.add(key);
+      batch.push({ key, ref });
+    }
+  }
+  queue.length = 0;
+  return batch;
+}
+
+/** Keep one resolved file, and queue whatever it references in turn. */
+function recordFile(key, body, state) {
+  state.bodies.set(key, body);
+
+  const desc = descriptionOf(body);
+  if (desc) {
+    state.partNames[key] = desc;
+  }
+
+  const { refs, texmaps } = refsIn(body);
+  if (texmaps.length > 0) {
+    state.texmapFiles.add(key);
+  }
+  state.queue.push(...refs);
+}
+
+/**
+ * Record one round's results. A reference that came back empty is noted as
+ * missing and not retried.
+ */
+function absorbRound(batch, resolved, state) {
+  for (const [i, body] of resolved.entries()) {
+    const { key, ref } = batch[i];
+    if (body === null || body === undefined) {
+      state.missing.add(ref);
+    } else {
+      recordFile(key, body, state);
+    }
+  }
+}
+
+/**
+ * Walk the dependency graph, resolving one breadth-first round at a time.
+ *
+ * Everything currently queued is resolved concurrently, and what comes back is
+ * scanned for the next round. Resolving one reference at a time is fine against
+ * a local directory and hopeless against a network resolver, where a single set
+ * is roughly 400 lookups.
+ *
+ * Mutates `bodies`, `partNames`, `missing` and `texmapFiles` in place.
+ */
+async function resolveDependencies(state) {
+  const { bodies, concurrency, queue, resolve, scanned } = state;
+  while (queue.length > 0) {
+    const batch = takeBatch(queue, scanned, bodies);
+    if (batch.length === 0) {
+      return;
+    }
+    // biome-ignore lint/performance/noAwaitInLoops: rounds are sequential by nature, since the next round is only known once this one resolves; the concurrency lives inside mapConcurrent
+    const resolved = await mapConcurrent(batch, concurrency, ({ key }) =>
+      resolve(key)
+    );
+    absorbRound(batch, resolved, state);
+  }
+}
+
+/**
+ * Set up the walk from the source text.
+ *
+ * An .mpd arrives with its subfiles already inside it. Those are seeded as
+ * bodies so they are never looked up externally, but they still get scanned for
+ * their own dependencies: a submodel references parts like anything else. A
+ * plain .ldr is simply its own root.
+ */
+// Breaches on CRAP, which is a coverage proxy rather than a complexity one:
+// cyclomatic 5 and cognitive 6 are well inside the limits, and 30 is simply what
+// an untested function with five branches scores. Splitting it further would
+// scatter one coherent setup step across three names to satisfy an arithmetic.
+// fallow-ignore-next-line complexity
+function seed(text, rootName) {
   const embedded = extractEmbedded(text);
-  const isMpd = embedded.size > 0;
-
-  const rootName = normalizeRef(name);
-  const rootKey = rootName.toLowerCase();
-
-  // Bodies to emit, keyed by normalized lowercase name. Subfiles that arrived
-  // embedded in an .mpd are seeded here so we never try to resolve them from
-  // the library, but they still get scanned for their own dependencies.
   const bodies = new Map();
   const partNames = {};
-  const missing = new Set();
+  const scanned = new Set();
   const texmapFiles = new Set();
+  const queue = [];
 
   let rootBody = text;
-  if (isMpd) {
-    const keys = [...embedded.keys()];
-    rootBody = embedded.get(keys[0]);
-    for (const key of keys.slice(1)) {
+  if (embedded.size > 0) {
+    const [first, ...rest] = embedded.keys();
+    rootBody = embedded.get(first);
+    for (const key of rest) {
       bodies.set(key, embedded.get(key));
     }
   }
 
-  const scanned = new Set();
-  const queue = [];
-
-  function enqueueFrom(key, body) {
+  const scan = (key, body) => {
     if (scanned.has(key)) {
       return;
     }
@@ -250,56 +352,43 @@ export async function packModel({ text, name, index, skipMissing = false }) {
       texmapFiles.add(key);
     }
     queue.push(...refs);
-  }
+  };
 
-  enqueueFrom(rootKey, rootBody);
+  scan(rootName.toLowerCase(), rootBody);
   for (const [key, body] of bodies) {
     const desc = descriptionOf(body);
     if (desc) {
       partNames[key] = desc;
     }
-    enqueueFrom(key, body);
+    scan(key, body);
   }
 
-  while (queue.length > 0) {
-    const ref = queue.shift();
-    const key = ref.toLowerCase();
-    if (scanned.has(key)) {
-      continue;
-    }
+  return {
+    bodies,
+    missing: new Set(),
+    partNames,
+    queue,
+    rootBody,
+    scanned,
+    texmapFiles,
+  };
+}
 
-    if (bodies.has(key)) {
-      enqueueFrom(key, bodies.get(key));
-      continue;
-    }
-
-    const diskPath = index.get(key);
-    if (!diskPath) {
-      missing.add(ref);
-      scanned.add(key); // do not report the same missing part once per reference
-      continue;
-    }
-
-    // biome-ignore lint/performance/noAwaitInLoops: the queue grows as each file is parsed, so the next reference is only known once this read finishes
-    const body = await readFile(diskPath, "utf8");
-    bodies.set(key, body);
-    const desc = descriptionOf(body);
-    if (desc) {
-      partNames[key] = desc;
-    }
-    enqueueFrom(key, body);
-  }
-
-  resolveAliasNames(partNames);
-
-  // An unresolved reference left in the output makes the loader reach for the
-  // parts library at runtime, which is not there, costing six failed HTTP
-  // requests per part before it gives up. Dropping the line is both faster and
-  // what "build the rest of it" has to mean.
+/**
+ * Concatenate every body into one .mpd, dropping references that went missing.
+ *
+ * An unresolved reference left in the output makes the loader reach for the
+ * parts library at runtime, which is not there, costing six failed HTTP
+ * requests per part before it gives up. Dropping the line is both faster and
+ * what "build the rest of it" has to mean.
+ */
+function assemble({ bodies, missing, rootBody, rootName, skipMissing }) {
   const missingKeys = new Set([...missing].map((ref) => ref.toLowerCase()));
+  const strip = skipMissing && missingKeys.size > 0;
   let skipped = 0;
+
   const emit = (body) => {
-    if (!skipMissing || missingKeys.size === 0) {
+    if (!strip) {
       return body.trimEnd();
     }
     const kept = [];
@@ -307,9 +396,9 @@ export async function packModel({ text, name, index, skipMissing = false }) {
       const match = REF_LINE.exec(line.trim());
       if (match && missingKeys.has(normalizeRef(match[1]).toLowerCase())) {
         skipped += 1;
-        continue;
+      } else {
+        kept.push(line);
       }
-      kept.push(line);
     }
     return kept.join("\n").trimEnd();
   };
@@ -318,7 +407,49 @@ export async function packModel({ text, name, index, skipMissing = false }) {
   for (const [key, body] of bodies) {
     chunks.push(`0 FILE ${key}`, emit(body), "");
   }
-  const mpd = chunks.join("\n");
+  return { mpd: chunks.join("\n"), skipped };
+}
+
+/**
+ * Pack `text` and all of its dependencies into one self-contained .mpd.
+ *
+ * @param {object} opts
+ * @param {string} opts.text  Raw .ldr or .mpd source.
+ * @param {string} opts.name  Name for the root model block.
+ * @param {(key: string) => Promise<string|null>} opts.resolve  Looks a
+ *   normalized reference up and returns its text, or null when it does not
+ *   exist. `localResolver` reads a checked-out parts library; the API routes
+ *   use a network resolver so a deployment needs no library at all.
+ * @param {number} [opts.concurrency]  How many references to resolve at once.
+ * @param {boolean} [opts.skipMissing]  Drop references that cannot be resolved
+ *   instead of leaving them in. The rest of the model still builds; without
+ *   this the caller is expected to treat `missing` as a failure.
+ * @returns {Promise<{mpd:string, partNames:Record<string,string>, missing:string[], stats:object}>}
+ */
+export async function packModel({
+  text,
+  name,
+  resolve,
+  concurrency = RESOLVE_CONCURRENCY,
+  skipMissing = false,
+}) {
+  const rootName = normalizeRef(name);
+  const state = seed(text, rootName);
+  const { bodies, missing, partNames, rootBody, texmapFiles } = state;
+  state.concurrency = concurrency;
+  state.resolve = resolve;
+
+  await resolveDependencies(state);
+
+  resolveAliasNames(partNames);
+
+  const { mpd, skipped } = assemble({
+    bodies,
+    missing,
+    rootBody,
+    rootName,
+    skipMissing,
+  });
 
   return {
     missing: [...missing],

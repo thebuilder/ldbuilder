@@ -1,39 +1,18 @@
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { analyze } from "../../../../scripts/lib/ldraw-analyze.mjs";
 // The packer is plain ESM in scripts/ so the CLI and this route share one
 // implementation; there is no second copy of the resolution rules to drift.
-import {
-  buildLibraryIndex,
-  packModel,
-} from "../../../../scripts/lib/ldraw-pack.mjs";
+import { packModel } from "../../../../scripts/lib/ldraw-pack.mjs";
+import { compressedJson } from "../../../server/compressed-json";
+import { getResolver } from "../../../server/parts-resolver";
 
 export const runtime = "nodejs";
-/** Indexing 36k files takes a second; never prerender or cache this route. */
+/** An uploaded model is never cached, so it always pays full resolution cost. */
 export const dynamic = "force-dynamic";
-
-// The library is a developer-installed folder that is read at request time and
-// must never be traced into the deployment output: it is 36k files. The ignore
-// comment tells Turbopack to leave the path alone.
-const LIBRARY_DIR = path.join(
-  /* turbopackIgnore: true */ process.cwd(),
-  "ldraw-library"
-);
+export const maxDuration = 60;
 
 /** 24 MB. Comfortably above the largest official set, well below a DoS. */
 const MAX_BYTES = 24 * 1024 * 1024;
-
-interface LibraryIndex {
-  index: Map<string, string>;
-}
-
-// Building the index walks the whole library, so do it once per process.
-let indexPromise: Promise<LibraryIndex> | null = null;
-
-function getIndex(): Promise<LibraryIndex> {
-  indexPromise ??= buildLibraryIndex(LIBRARY_DIR) as Promise<LibraryIndex>;
-  return indexPromise;
-}
 
 export async function POST(request: Request): Promise<Response> {
   let payload: { name?: unknown; text?: unknown };
@@ -61,32 +40,16 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  let index: Map<string, string>;
   try {
-    ({ index } = await getIndex());
-  } catch {
-    indexPromise = null;
-    return NextResponse.json(
-      { error: libraryMissingMessage() },
-      { status: 503 }
-    );
-  }
+    const { concurrency, resolve } = await getResolver();
 
-  if (index.size === 0) {
-    indexPromise = null;
-    return NextResponse.json(
-      { error: libraryMissingMessage() },
-      { status: 503 }
-    );
-  }
-
-  try {
     // Drop unresolvable parts instead of refusing the file. Refusing leaves
     // the person with an error and no way to act on it, when the other 4,000
     // bricks would have built fine.
     const result = (await packModel({
-      index,
+      concurrency,
       name,
+      resolve,
       skipMissing: true,
       text,
     })) as {
@@ -107,7 +70,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    return NextResponse.json({
+    return await compressedJson(request, {
       bricks,
       bytes: result.stats.bytes,
       files: result.stats.files,
@@ -120,11 +83,4 @@ export async function POST(request: Request): Promise<Response> {
     const message = error instanceof Error ? error.message : "Packing failed.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
-
-function libraryMissingMessage(): string {
-  // No shell command here. Whoever dropped the file is not necessarily whoever
-  // can install the library, and a build instruction is not something they can
-  // act on from this page.
-  return "This server does not have the LDraw parts library available, so a raw .ldr cannot have its parts resolved. A self-contained .mpd file will open without it.";
 }

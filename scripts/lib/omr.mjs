@@ -56,6 +56,21 @@ function readMetadata(text) {
 }
 
 /**
+ * Keep a download for next time, if the filesystem allows it.
+ *
+ * A serverless filesystem is read-only. Caching is a developer convenience so a
+ * re-pack does not refetch, never a requirement for serving the set.
+ */
+async function cacheDownload(file, text) {
+  try {
+    await mkdir(OMR_CACHE, { recursive: true });
+    await writeFile(file, text);
+  } catch {
+    // Read-only, out of space, whatever. The caller already has the text.
+  }
+}
+
+/**
  * Fetch one OMR set, caching the download.
  *
  * @returns {Promise<{ setId: string, text: string, metadata: object }>}
@@ -79,8 +94,7 @@ export async function fetchSet(id) {
       );
     }
     text = await response.text();
-    await mkdir(OMR_CACHE, { recursive: true });
-    await writeFile(cached, text);
+    await cacheDownload(cached, text);
   }
 
   return { metadata: readMetadata(text), setId, text };

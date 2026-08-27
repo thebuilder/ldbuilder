@@ -1,0 +1,17 @@
+{
+  "clone_groups": [
+    "scripts/lib/ldraw-pack.mjs:124-133|src/ldraw/mpd.ts:121-130",
+    "scripts/lib/ldraw-analyze.mjs:20-28|scripts/lib/ldraw-pack.mjs:193-201",
+    "scripts/fetch-omr.mjs:40-48|scripts/pack-models.mjs:285-293"
+  ],
+  "clone_fingerprints": [
+    "dup:6ea61eaf:2",
+    "dup:cfd5e783:2",
+    "dup:4b606294:2"
+  ],
+  "normalized_clone_fingerprints": [
+    "dup:c77b3abb6f87acd9-2:2",
+    "dup:c77b3abb6f87acd9-3:2",
+    "dup:c77b3abb6f87acd9-1:2"
+  ]
+}
