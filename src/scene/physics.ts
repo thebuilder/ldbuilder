@@ -56,6 +56,29 @@ export function gravityFor(dropHeight: number): number {
   return (2 * dropHeight) / (FALL_SECONDS * FALL_SECONDS);
 }
 
+/** A brick is 24 LDraw units tall, which is the length everything here is felt against. */
+const BRICK_HEIGHT = 24;
+
+/**
+ * Gravity for a world somebody has their hands in.
+ *
+ * The poured bag derives gravity from the height it falls from, so the drop
+ * takes the same time to watch whatever the model's scale. That is the right
+ * answer for an animation and the wrong one for handling: it makes a brick let
+ * go of a few studs up hit the floor almost immediately, which leaves no time
+ * for a throw to travel and reads as the brick being dropped rather than
+ * thrown. Scaling to the brick instead gives it somewhere to go.
+ *
+ * A fifth of a second to fall its own height. Real gravity would do that in
+ * about a twentieth, which at this scale reads as bricks snapping to the floor
+ * with nowhere for a throw to go; much slower than this and they float. Two
+ * tenths keeps the weight and buys a thrown brick the half second of air it
+ * needs to travel.
+ */
+const HANDLING_FALL_SECONDS = 0.2;
+export const HANDLING_GRAVITY =
+  (2 * BRICK_HEIGHT) / (HANDLING_FALL_SECONDS * HANDLING_FALL_SECONDS);
+
 /** Barely any bounce: ABS on a table does not bounce much. */
 export const BRICK_RESTITUTION = 0.05;
 export const BRICK_FRICTION = 1.1;

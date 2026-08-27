@@ -124,6 +124,89 @@ describe("LiveWorld", () => {
     live.dispose();
   });
 
+  it("throws far enough to be a throw, not a drop", () => {
+    const live = world();
+    const brick = makeBrick(0);
+    live.spawn(brick, {
+      position: new Vector3(0, 100, 0),
+      quaternion: new Quaternion(),
+    });
+    live.grab(0, brick.object.position, brick.object.quaternion);
+
+    // A flick across the table: a quarter of a second of steady travel.
+    for (let frame = 1; frame <= 15; frame += 1) {
+      live.moveHeld(new Vector3(frame * 40, 100, 0), new Quaternion(), 1 / 60);
+      live.step(1 / 60);
+    }
+    live.release();
+    live.sync([brick]);
+    const from = brick.object.position.x;
+    live.settleNow(SETTLE_STEPS);
+    live.sync([brick]);
+
+    // Measured from where it was let go: several bricks' worth of travel, not
+    // the couple of units a brick that merely falls would manage.
+    expect(brick.object.position.x - from).toBeGreaterThan(150);
+    live.dispose();
+  });
+
+  it("caps a throw, so a pointer that jumps does not fire a brick away", () => {
+    const live = world();
+    const brick = makeBrick(0);
+    live.spawn(brick, {
+      position: new Vector3(0, 100, 0),
+      quaternion: new Quaternion(),
+    });
+    live.grab(0, brick.object.position, brick.object.quaternion);
+
+    // One frame across a hundred thousand units: no arm did that.
+    for (let frame = 1; frame <= 10; frame += 1) {
+      live.moveHeld(
+        new Vector3(frame * 100_000, 100, 0),
+        new Quaternion(),
+        1 / 60
+      );
+      live.step(1 / 60);
+    }
+    live.release();
+    live.sync([brick]);
+    // Measured from where it was let go: the hand itself teleported it across
+    // the table, and that is not the throw.
+    const from = brick.object.position.x;
+    live.settleNow(30);
+    live.sync([brick]);
+
+    // Half a second at the cap is the furthest it can have carried.
+    expect(brick.object.position.x - from).toBeLessThan(2500);
+    live.dispose();
+  });
+
+  it("lets a brick go from outside the world with the speed it had", () => {
+    const live = world();
+    const brick = makeBrick(0);
+    brick.object.position.set(0, 200, 0);
+
+    live.drop(brick, new Vector3(500, 0, 0));
+    live.settleNow(SETTLE_STEPS);
+    live.sync([brick]);
+
+    expect(brick.object.position.x).toBeGreaterThan(200);
+    live.dispose();
+  });
+
+  it("drops a brick straight down when it was not moving", () => {
+    const live = world();
+    const brick = makeBrick(0);
+    brick.object.position.set(0, 200, 0);
+
+    live.drop(brick, new Vector3());
+    live.settleNow(SETTLE_STEPS);
+    live.sync([brick]);
+
+    expect(Math.abs(brick.object.position.x)).toBeLessThan(5);
+    live.dispose();
+  });
+
   it("releasing nothing is not an error", () => {
     const live = world();
 

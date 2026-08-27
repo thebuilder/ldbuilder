@@ -62,6 +62,9 @@ const MAX_POUR = 50;
 /** How fast a carried brick eases to the pose the grid picked for it. */
 const CARRY_LAMBDA = 22;
 
+/** Smoothing on the speed a carried brick is tracked at, for throwing it. */
+const CARRY_VELOCITY_LAMBDA = 18;
+
 const SAVE_INTERVAL_MS = 1500;
 
 export interface Armed {
@@ -101,6 +104,14 @@ interface Carried {
   nudge: { x: number; y: number; z: number };
   part: PalettePart;
   tip: number;
+  /** False until the hand has a previous position to measure against. */
+  tracked: boolean;
+  /**
+   * How fast the part is actually moving, smoothed. Kept so that letting one go
+   * throws it rather than dropping it: the momentum of the gesture is the whole
+   * difference between putting a brick down and lobbing it across the floor.
+   */
+  velocity: Vector3;
   yaw: number;
 }
 
@@ -136,6 +147,8 @@ export class FreeController {
   private readonly halfExtents = new Vector3();
   private readonly center = new Vector3();
   private readonly quaternion = new Quaternion();
+  private readonly lastCarried = new Vector3();
+  private readonly carryStep = new Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -220,6 +233,8 @@ export class FreeController {
       nudge: { x: 0, y: 0, z: 0 },
       part,
       tip: 0,
+      tracked: false,
+      velocity: new Vector3(),
       yaw: 0,
     };
     this.report();
@@ -341,7 +356,7 @@ export class FreeController {
     if (carried.from === "inventory") {
       this.destroy(carried.brick.id);
     } else {
-      this.dropLoose(carried.brick);
+      this.dropLoose(carried.brick, carried.velocity);
     }
     this.report();
   }
@@ -453,6 +468,8 @@ export class FreeController {
     }
     this.resolveSnap(carried);
 
+    this.trackHand(carried, dt);
+
     const { object } = carried.brick;
     // Eased rather than teleported: at grid resolution a jump of a whole stud
     // is a jump, and following it is what tells you the snap happened. Only the
@@ -488,6 +505,31 @@ export class FreeController {
       this.snapped
     );
     carried.blocked = result.blocked;
+  }
+
+  /**
+   * How fast the hand is moving over the table.
+   *
+   * Taken from the pointer rather than from the brick, because the brick is
+   * eased towards the grid and picking one up moves it a stud or two on its
+   * own. Counting that as a throw means every part let go where it was picked
+   * up shoots off across the floor.
+   */
+  private trackHand(carried: Carried, dt: number): void {
+    if (!carried.tracked) {
+      carried.tracked = true;
+      this.lastCarried.copy(this.desired);
+      return;
+    }
+    if (dt <= 0) {
+      return;
+    }
+    this.carryStep.copy(this.desired).sub(this.lastCarried).divideScalar(dt);
+    this.lastCarried.copy(this.desired);
+    carried.velocity.lerp(
+      this.carryStep,
+      1 - Math.exp(-CARRY_VELOCITY_LAMBDA * dt)
+    );
   }
 
   /** Where the pointer meets the build, or the floor if it meets nothing. */
@@ -595,6 +637,8 @@ export class FreeController {
       nudge: { x: 0, y: 0, z: 0 },
       part,
       tip: placement?.tip ?? 0,
+      tracked: false,
+      velocity: new Vector3(),
       yaw: placement?.yaw ?? 0,
     };
     this.snapped.copy(brick.object.position);
@@ -634,14 +678,11 @@ export class FreeController {
     carried.brick = replacement;
   }
 
-  private dropLoose(brick: Brick): void {
+  private dropLoose(brick: Brick, velocity: Vector3): void {
     if (!this.world) {
       return;
     }
-    this.world.spawn(brick, {
-      position: brick.object.position,
-      quaternion: brick.object.quaternion,
-    });
+    this.world.drop(brick, velocity);
     this.loose.add(brick.id);
   }
 
@@ -665,12 +706,14 @@ export class FreeController {
    */
   private poseOf(carried: Carried): void {
     orientation(carried.yaw, carried.tip, this.quaternion);
+    // The solid box, not the whole part: a brick lands on the body of the one
+    // below it, and its own studs go inside whatever is put on top later.
     rotatedHalfExtents(
-      carried.part.halfExtents,
+      carried.part.solidHalfExtents,
       this.quaternion,
       this.halfExtents
     );
-    rotatedCenter(carried.part.localCenter, this.quaternion, this.center);
+    rotatedCenter(carried.part.solidCenter, this.quaternion, this.center);
   }
 
   private boxOf(carried: Carried, position: Vector3): Box3 {
@@ -764,8 +807,12 @@ export class FreeController {
         yaw: entry.y,
       };
       this.placements.set(brick.id, placement);
-      rotatedHalfExtents(part.halfExtents, this.quaternion, this.halfExtents);
-      rotatedCenter(part.localCenter, this.quaternion, this.center);
+      rotatedHalfExtents(
+        part.solidHalfExtents,
+        this.quaternion,
+        this.halfExtents
+      );
+      rotatedCenter(part.solidCenter, this.quaternion, this.center);
       this.placedBoxes.set(
         brick.id,
         boxFor(position, this.halfExtents, this.center, new Box3()).clone()

@@ -41,6 +41,7 @@ export interface PalettePart {
   /** `3001.dat`. */
   file: string;
   group: string;
+  /** The whole part, studs included. This is the shape physics collides on. */
   halfExtents: Vector3;
   localCenter: Vector3;
   meshes: Mesh[];
@@ -48,6 +49,16 @@ export interface PalettePart {
   radius: number;
   /** Size in studs as the part's own description states it, for filtering. */
   size: number[];
+  /**
+   * The part without its studs: the shape another part rests on.
+   *
+   * Stacking bricks is stud into tube, not brick onto stud, so what a brick
+   * lands on is the top of the body below it. Resting on the bounding box
+   * instead leaves every brick in a build floating four units clear of the one
+   * under it, which is a stud's height and reads as exactly the gap it is.
+   */
+  solidCenter: Vector3;
+  solidHalfExtents: Vector3;
   /** Prototype, detached and never posed. Instances are clones of this. */
   template: Object3D;
 }
@@ -121,6 +132,7 @@ export async function loadPalette(): Promise<Palette> {
     template.scale.set(1, 1, 1);
     template.updateMatrixWorld(true);
 
+    const solid = solidBox(brick.halfExtents, brick.localCenter);
     byFile.set(brick.partFile.toLowerCase(), {
       file: brick.partFile,
       group: "",
@@ -132,6 +144,8 @@ export async function loadPalette(): Promise<Palette> {
       // only radius that stays true whichever way up it ends.
       radius: brick.halfExtents.length(),
       size: [],
+      solidCenter: solid.center,
+      solidHalfExtents: solid.half,
       template,
     });
   }
@@ -165,6 +179,33 @@ export async function loadPalette(): Promise<Palette> {
   };
 
   return { byFile, groups, materials };
+}
+
+/**
+ * The part with its studs trimmed off.
+ *
+ * LDraw puts a part's origin on its stud plane and points Y downwards, so in a
+ * part's own frame the body runs from zero to positive Y and anything at
+ * negative Y is standing proud of that plane: the studs. Clipping there is a
+ * measurement rather than a guess, and it gives the right answer for a tile,
+ * which has nothing above the plane and so is not trimmed at all.
+ */
+function solidBox(
+  halfExtents: Vector3,
+  localCenter: Vector3
+): { center: Vector3; half: Vector3 } {
+  const bottom = Math.max(localCenter.y - halfExtents.y, 0);
+  const top = localCenter.y + halfExtents.y;
+  return {
+    center: new Vector3(localCenter.x, (bottom + top) / 2, localCenter.z),
+    // A part that is all stud and no body keeps a sliver, so nothing ends up
+    // with a zero-height surface to rest on.
+    half: new Vector3(
+      halfExtents.x,
+      Math.max((top - bottom) / 2, 0.5),
+      halfExtents.z
+    ),
+  };
 }
 
 function pose(): Pose {

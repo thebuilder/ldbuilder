@@ -376,6 +376,43 @@ describe("SceneController dragging", () => {
     expect(held.drag).toBeNull();
   });
 
+  it("says which brick is under the pointer, and that it can be picked up", async () => {
+    const hovered: (number | null)[] = [];
+    await startBuild();
+    controller.setCallbacks({ onHover: (id) => hovered.push(id) });
+
+    canvas.dispatchEvent(pointer("pointermove"));
+
+    expect(hovered.at(-1)).toBe(0);
+    expect(canvas.style.cursor).toBe("grab");
+  });
+
+  it("reports nothing once the pointer leaves the bricks", async () => {
+    const hovered: (number | null)[] = [];
+    await startBuild();
+    controller.setCallbacks({ onHover: (id) => hovered.push(id) });
+    canvas.dispatchEvent(pointer("pointermove"));
+
+    lookDownAt(5000, 24, 5000);
+    canvas.dispatchEvent(pointer("pointermove"));
+
+    expect(hovered.at(-1)).toBeNull();
+  });
+
+  it("stops picking while a brick is being carried", async () => {
+    const hovered: (number | null)[] = [];
+    await startBuild();
+    canvas.dispatchEvent(pointer("pointerdown"));
+    controller.setCallbacks({ onHover: (id) => hovered.push(id) });
+
+    // The hit under the pointer is meaningless mid-carry, and the raycast is
+    // the most expensive thing in the pointer path.
+    canvas.dispatchEvent(pointer("pointermove"));
+
+    expect(hovered).toEqual([]);
+    window.dispatchEvent(pointer("pointerup"));
+  });
+
   it("ignores anything but the primary button", async () => {
     await startBuild();
 
@@ -385,15 +422,27 @@ describe("SceneController dragging", () => {
   });
 
   it("carries the brick to where the pointer went", async () => {
-    const model = await startBuild();
+    // A brick with no slot open for it, so nothing pulls it off the pointer:
+    // snapping has its own test, and this one is about following.
+    const model = makeModel({
+      bricks: [
+        { at: [0, 24, 0], colorCode: 4, step: 0 },
+        { at: [400, 24, 400], colorCode: 1, step: 1 },
+      ],
+      slug: "test-build",
+    });
+    model.bricks[1].floorPose.position.set(400, 24, 400);
+    await startBuild(model, 1);
     canvas.dispatchEvent(pointer("pointerdown"));
+    // Where the pour happened to leave it is not the point; how far it moves is.
+    const from = model.bricks[1].object.position.clone();
 
     window.dispatchEvent(
-      pointer("pointermove", { clientX: VIEWPORT.width / 2 + 120 })
+      pointer("pointermove", { clientX: VIEWPORT.width / 2 + 200 })
     );
-    await run();
+    await run(6);
 
-    expect(model.bricks[0].object.position.x).toBeGreaterThan(20);
+    expect(model.bricks[1].object.position.x - from.x).toBeGreaterThan(20);
     window.dispatchEvent(pointer("pointerup"));
   });
 
@@ -520,13 +569,17 @@ describe("SceneController watch mode", () => {
   });
 
   it("plays the build forward and says which step it reached", async () => {
+    // Skip the pour: playback does not start until the bricks are down, and
+    // waiting for a second of falling makes the test a race with the machine.
+    vi.unstubAllGlobals();
+    stubBrowser(true);
     const model = buildableModel();
     const steps: number[] = [];
     controller.setCallbacks({ onStepAdvance: (step) => steps.push(step) });
     controller.setModel(model);
     controller.setInput(input({ playing: true, speed: 4 }));
 
-    await run(60);
+    await run(40);
 
     expect(steps.length).toBeGreaterThan(0);
   });
