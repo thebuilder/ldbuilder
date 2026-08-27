@@ -189,8 +189,15 @@ export class LiveWorld {
     this.bodies.set(brick.id, body);
   }
 
-  /** Tip a whole bag out above its floor layout and let it land live. */
-  pour(bag: BagInfo, bricks: Brick[], seed: string): void {
+  /**
+   * Tip a whole bag out above its floor layout and let it land live.
+   *
+   * `placed` marks bricks that are already in the model, which is what a build
+   * begun partway into a bag looks like: those slots are filled, so there is
+   * nothing left in the bag to tip out for them. Their turn of the random draw
+   * is still taken, so every other brick lands exactly where it would have.
+   */
+  pour(bag: BagInfo, bricks: Brick[], seed: string, placed?: Uint8Array): void {
     const random = makeRandom(hashString(`${seed}:build${bag.index}`));
     const position = new Vector3();
     const tilt = new Quaternion();
@@ -226,6 +233,9 @@ export class LiveWorld {
         (random() - 0.5) * 6
       );
 
+      if (placed?.[id] === 1) {
+        continue;
+      }
       this.spawn(brick, { angvel, linvel, position, quaternion: tilt });
     }
   }

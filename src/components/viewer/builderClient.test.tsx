@@ -140,6 +140,21 @@ describe("BuilderClient", () => {
     expect(screen.queryByLabelText("Build step")).toBeNull();
   });
 
+  it("opens the parts list on the step when the build starts", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    // Watching is a question about the model, so the list starts on all of it.
+    expect(screen.getByText("All").dataset.active).toBe("true");
+
+    await user.click(screen.getByTitle(/put the model together yourself/));
+
+    // Building is a question about one step: what am I looking for now.
+    await waitFor(() =>
+      expect(screen.getByText("Step").dataset.active).toBe("true")
+    );
+  });
+
   it("shows what the step needs once the scene reports progress", async () => {
     await open("?flow=build");
 

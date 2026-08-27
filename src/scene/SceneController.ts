@@ -116,6 +116,17 @@ export interface SceneCallbacks {
 }
 
 /** A brick being carried, and where it is being carried to. */
+/** Where a build begins, worked out before anything is put on the floor. */
+interface BuildStart {
+  /** Loose poses to put back, or null to tip the bag out fresh. */
+  loose: number[] | null;
+  /** Slots already filled inside the starting step. */
+  placed: number[];
+  /** Whether to say the build was picked up rather than started. */
+  resumed: boolean;
+  step: number;
+}
+
 interface DragState {
   /** Set when the brick is flying home on its own after a double press. */
   assisting: boolean;
@@ -608,16 +619,9 @@ export class SceneController {
     this.build = new BuildSession(model);
     this.ghosts = new SlotGhosts(model.root);
 
-    const save = resume && this.savable ? readBuild(model.slug) : null;
-    const usable =
-      save !== null &&
-      matchesModel(save, model.bricks.length, model.steps.length) &&
-      (save.step > 0 || save.placed.length > 0);
-
-    if (usable) {
-      this.build.restore(save.step, save.placed);
-    }
-    this.buildResumed = usable;
+    const start = this.buildStart(resume, model);
+    this.build.restore(start.step, start.placed);
+    this.buildResumed = start.resumed;
 
     for (const brick of model.bricks) {
       if (this.build.placed[brick.id] === 1) {
@@ -627,10 +631,17 @@ export class SceneController {
 
     this.step = this.build.step;
     this.activeBag = -1;
-    this.openBuildBag(this.build.bag, !usable);
+    this.openBuildBag(this.build.bag, start.loose === null);
 
-    if (usable) {
-      this.restoreLoose(save.loose);
+    if (start.loose) {
+      this.restoreLoose(start.loose);
+    }
+
+    // The step is the build's from here on, so say so upward: the URL, and the
+    // parts list reading off it, would otherwise still be describing whatever
+    // step the watcher had left behind.
+    if (this.step !== this.input.step) {
+      this.callbacks.onStepAdvance?.(this.step);
     }
 
     this.framing = "table";
@@ -640,6 +651,54 @@ export class SceneController {
     this.refreshGhosts();
     this.reportBuild(true);
     pruneBuilds();
+  }
+
+  /**
+   * Where a build begins.
+   *
+   * Two claims about how far in you are: the saved build, and the step you
+   * were just watching. The further one wins. Switching to build mode after
+   * watching thirty steps should hand you step thirty-one rather than an empty
+   * floor, and scrubbing back to look at something should not quietly throw
+   * away a build that had already reached step two hundred.
+   *
+   * The watched step stops one short of the end. Playing a model through and
+   * then pressing build is a normal way to arrive here, and handing back a
+   * finished model with nothing left to do is a dead end; the last step is
+   * not. A build only finishes by being built.
+   */
+  private buildStart(resume: boolean, model: ModelData): BuildStart {
+    const fresh: BuildStart = {
+      loose: null,
+      placed: [],
+      resumed: false,
+      step: 0,
+    };
+    if (!resume) {
+      return fresh;
+    }
+
+    const last = Math.max(model.steps.length - 1, 0);
+    const watched = Math.min(Math.max(this.input.step, 0), last);
+    const save = this.savable ? readBuild(model.slug) : null;
+    const usable =
+      save !== null &&
+      matchesModel(save, model.bricks.length, model.steps.length) &&
+      (save.step > 0 || save.placed.length > 0);
+
+    if (!(usable && save.step >= watched)) {
+      return { ...fresh, step: watched };
+    }
+
+    return {
+      loose: save.loose,
+      placed: save.placed,
+      // Say a build was picked up only when doing so moved you. The notice is
+      // there to explain a jump, and being handed the step the URL already
+      // named is not one.
+      resumed: save.step !== this.input.step,
+      step: save.step,
+    };
   }
 
   /** Throw the saved build away and start this model again from step one. */
@@ -698,7 +757,7 @@ export class SceneController {
     world.clearLoose();
 
     if (pour) {
-      world.pour(bag, model.bricks, model.slug);
+      world.pour(bag, model.bricks, model.slug, this.build?.placed);
       if (prefersReducedMotion()) {
         // The falling is decorative; the pile is not. Run the solver forward
         // with nothing drawn so the bricks are simply already down.

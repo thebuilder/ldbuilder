@@ -140,32 +140,52 @@ export class BuildSession {
     return true;
   }
 
-  /** Reinstate a saved build. Slot ids that no longer exist are ignored. */
-  restore(step: number, placedIds: number[]): void {
+  /**
+   * Reinstate a build at `step`, with `placedIds` naming any slots already
+   * filled inside it. Ids that no longer exist are ignored.
+   *
+   * Everything before `step` is in the model by definition: a step cannot be
+   * left until every slot in it is filled. Deriving that here rather than
+   * trusting the list keeps a truncated save from stranding bricks between the
+   * floor, where they are no longer loose, and the model, where they are not
+   * yet placed. It is also what lets a build start at a step that was only ever
+   * watched, where there is no list of filled slots to hand at all.
+   */
+  restore(step: number, placedIds: number[] = []): void {
     this.placed.fill(0);
     this.placedCount = 0;
-    for (const id of placedIds) {
-      if (id >= 0 && id < this.placed.length && this.placed[id] === 0) {
-        this.placed[id] = 1;
-        this.placedCount += 1;
-      }
-    }
     this.step = Math.min(Math.max(step, 0), this.totalSteps);
 
-    // Everything in an earlier bag is in the model by definition: a bag cannot
-    // be left until every slot in it is filled. Deriving that here rather than
-    // trusting the save keeps a truncated one from stranding bricks between the
-    // floor, where they are no longer loose, and the model, where they are not
-    // yet placed.
+    for (let index = 0; index < this.step; index += 1) {
+      for (const id of this.model.steps[index]?.brickIds ?? []) {
+        this.fill(id);
+      }
+    }
+
+    // Steps account for every brick a model can place, but a brick with a step
+    // number no model step claims would be left loose for good. An earlier bag
+    // is closed, so anything still in one belongs in the model.
     const { bag } = this;
     for (const brick of this.model.bricks) {
-      if (brick.bag < bag && this.placed[brick.id] === 0) {
-        this.placed[brick.id] = 1;
-        this.placedCount += 1;
+      if (brick.bag < bag) {
+        this.fill(brick.id);
+      }
+    }
+
+    for (const id of placedIds) {
+      if (id >= 0 && id < this.placed.length) {
+        this.fill(id);
       }
     }
 
     this.refresh();
+  }
+
+  private fill(id: number): void {
+    if (this.placed[id] === 0) {
+      this.placed[id] = 1;
+      this.placedCount += 1;
+    }
   }
 
   placedIds(): number[] {

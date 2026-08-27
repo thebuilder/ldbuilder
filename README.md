@@ -6,9 +6,10 @@ layer, isolate a submodel, or click any single brick to find out what it is.
 
 Or build it yourself. In **build mode** the bag lands as a live physics pile you
 can dig through, shove and throw pieces out of; each step lights up the slots it
-needs, and a piece dropped near the right one clicks into place. Progress is
-saved in the browser, so a set with eight hundred steps in it can be picked up
-where you left off.
+needs, and a piece dropped near the right one clicks into place. Switching over
+from watching hands you the step you were watching, already built up to that
+point, and progress is saved in the browser, so a set with eight hundred steps
+in it can be picked up where you left off.
 
 Or build something nobody designed. **Free build** is a floor, a box of two
 hundred parts in any colour the library defines, and no instructions: take a
