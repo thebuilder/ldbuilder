@@ -42,29 +42,41 @@ describe("BuildSession", () => {
     const session = new BuildSession(model());
 
     // Brick 1 is the same part and colour as brick 0, so it fills brick 0's slot.
-    expect(session.findSlot(1, new Vector3(0, 24, 0), 30)).toBe(0);
+    expect(session.findSlot(1, new Vector3(0, 12, 0), 30)).toBe(0);
     expect(session.slotsFor(1)).toEqual([0, 1]);
+  });
+
+  it("aims at the middle of a slot, not at the part's origin", () => {
+    const data = model();
+    const session = new BuildSession(data);
+    const [slot] = data.bricks;
+
+    // LDraw puts a part's origin on its stud face, a whole brick from the
+    // middle. Aiming by origins means lining up something nobody can see.
+    expect(slot.center.y).not.toBe(slot.builtPose.position.y);
+    expect(session.findSlot(1, slot.center.clone(), 4)).toBe(0);
+    expect(session.findSlot(1, slot.builtPose.position.clone(), 4)).toBeNull();
   });
 
   it("refuses a brick whose part or colour is wrong", () => {
     const session = new BuildSession(model());
 
     // Brick 2 is the right part but the wrong colour for step one's slots.
-    expect(session.findSlot(2, new Vector3(0, 24, 0), 30)).toBeNull();
+    expect(session.findSlot(2, new Vector3(0, 12, 0), 30)).toBeNull();
     expect(session.slotsFor(2)).toEqual([]);
   });
 
   it("takes the nearest slot when two would accept the same brick", () => {
     const session = new BuildSession(model());
 
-    expect(session.findSlot(1, new Vector3(70, 24, 0), 200)).toBe(1);
-    expect(session.findSlot(1, new Vector3(10, 24, 0), 200)).toBe(0);
+    expect(session.findSlot(1, new Vector3(70, 12, 0), 200)).toBe(1);
+    expect(session.findSlot(1, new Vector3(10, 12, 0), 200)).toBe(0);
   });
 
   it("ignores slots outside the snap radius", () => {
     const session = new BuildSession(model());
 
-    expect(session.findSlot(1, new Vector3(0, 24, 400), 30)).toBeNull();
+    expect(session.findSlot(1, new Vector3(0, 12, 400), 30)).toBeNull();
   });
 
   it("advances only once every slot in the step is filled", () => {

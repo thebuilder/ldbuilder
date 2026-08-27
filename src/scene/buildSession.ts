@@ -79,10 +79,17 @@ export class BuildSession {
   /**
    * The slot this brick would drop into, or null.
    *
+   * `centre` is the middle of the carried brick, and what it is measured
+   * against is the middle of the slot. Neither is the part's origin, which
+   * LDraw puts on the stud face: a brick picked up upside down out of the pile
+   * has its origin a whole brick away from where the brick appears to be, so
+   * aiming by origins means lining up something you cannot see and overshooting
+   * the thing you can.
+   *
    * Nearest wins, so two adjacent slots taking the same part do not fight over
    * a brick hovering between them.
    */
-  findSlot(brickId: number, position: Vector3, radius: number): number | null {
+  findSlot(brickId: number, centre: Vector3, radius: number): number | null {
     const key = this.keyOf(brickId);
     let best: number | null = null;
     let bestDistance = radius * radius;
@@ -91,8 +98,8 @@ export class BuildSession {
       if (this.keys[slotId] !== key) {
         continue;
       }
-      const distance = position.distanceToSquared(
-        this.model.bricks[slotId].builtPose.position
+      const distance = centre.distanceToSquared(
+        this.model.bricks[slotId].center
       );
       if (distance < bestDistance) {
         bestDistance = distance;

@@ -270,6 +270,40 @@ describe("FreeController", () => {
     expect(Math.abs(heights[0] - heights[1])).toBe(24);
   });
 
+  it("says a part will not fit as soon as it is nudged there", async () => {
+    const latest = watch();
+    await open();
+    controller.arm({ colorCode: RED, file: "3001.dat" });
+    controller.takeOut("3001.dat", RED);
+    await run();
+    canvas.dispatchEvent(pointer("pointerdown"));
+    await run();
+    expect(latest()?.carrying?.blocked).toBe(false);
+
+    // Two plates down from resting on the brick below is inside it. The answer
+    // has to be in the report this nudge produces, not the one after it, or the
+    // warning arrives once you have already moved back out.
+    controller.nudge(0, -2, 0);
+
+    expect(latest()?.carrying?.blocked).toBe(true);
+
+    controller.nudge(0, 2, 0);
+    expect(latest()?.carrying?.blocked).toBe(false);
+  });
+
+  it("says a part will not fit as soon as it is turned into something", async () => {
+    const latest = watch();
+    await open();
+    controller.takeOut("3001.dat", RED);
+    await run();
+
+    // Turning changes the footprint, so it changes what the part runs into.
+    controller.rotate(1, 0);
+
+    expect(latest()?.carrying?.yaw).toBe(1);
+    expect(latest()?.carrying?.blocked).toBe(false);
+  });
+
   it("tips a handful onto the floor as loose bricks", async () => {
     const latest = watch();
     await open();

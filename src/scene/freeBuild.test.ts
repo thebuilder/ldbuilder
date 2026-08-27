@@ -145,7 +145,7 @@ describe("snapPlacement", () => {
   it("stacks a part on the one below it", () => {
     const built = new Map([[1, placed(new Vector3(0, 24, 0))]]);
 
-    const result = snap(new Vector3(3, 0, 3), brick2x4, built);
+    const result = snap(new Vector3(3, 24, 3), brick2x4, built);
 
     expect(result.position.y).toBeCloseTo(48, 6);
     expect(result.restingOn).toBe(1);
@@ -162,23 +162,57 @@ describe("snapPlacement", () => {
     expect(result.restingOn).toBeNull();
   });
 
-  it("rests on the highest thing under the footprint, not the nearest", () => {
+  it("rests on the surface nearest to where the pointer is pointing", () => {
+    // Two bricks with a brick-sized gap between them: floors at 0, 24 and 72.
     const built = new Map([
       [1, placed(new Vector3(0, 24, 0))],
       [2, placed(new Vector3(0, 72, 0))],
     ]);
 
+    // Pointing at the top of the stack builds on the top of the stack.
+    expect(snap(new Vector3(0, 72, 0), brick2x4, built).position.y).toBeCloseTo(
+      96,
+      6
+    );
+    // Pointing at the top of the lower brick builds there instead, which is the
+    // only way to put something into a gap rather than always on top.
+    expect(snap(new Vector3(0, 24, 0), brick2x4, built).position.y).toBeCloseTo(
+      48,
+      6
+    );
+  });
+
+  it("passes over a surface the part will not fit on", () => {
+    const built = new Map([
+      [1, placed(new Vector3(0, 24, 0))],
+      [2, placed(new Vector3(0, 72, 0))],
+    ]);
+
+    // The floor is nearest to the pointer and full, so the next one up wins.
     const result = snap(new Vector3(0, 0, 0), brick2x4, built);
 
-    expect(result.position.y).toBeCloseTo(96, 6);
-    expect(result.restingOn).toBe(2);
+    expect(result.position.y).toBeCloseTo(48, 6);
+    expect(result.blocked).toBe(false);
+    expect(result.restingOn).toBe(1);
+  });
+
+  it("ignores a stack beside the footprint, however tall it is", () => {
+    const built = new Map([[1, placed(new Vector3(400, 240, 0))]]);
+
+    // Pointing high up does not lift a part onto something it is not over.
+    const result = snap(new Vector3(0, 240, 0), brick2x4, built);
+
+    expect(result.position.y).toBeCloseTo(24, 6);
+    expect(result.restingOn).toBeNull();
   });
 
   it("says so when a part would pass through what is already built", () => {
     const built = new Map([[1, placed(new Vector3(0, 24, 0))]]);
 
-    // It would rest on top; nudged down two plates it is inside instead.
-    const result = snap(new Vector3(0, 0, 0), brick2x4, built, {
+    // It would rest on top; nudged down two plates it is inside instead. A
+    // height set by hand is a decision, so it is put where it was asked for and
+    // reported as not fitting rather than quietly moved somewhere it does.
+    const result = snap(new Vector3(0, 24, 0), brick2x4, built, {
       x: 0,
       y: -2,
       z: 0,

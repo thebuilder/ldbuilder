@@ -47,11 +47,14 @@ const FALLBACK_POUR_SECONDS = 2.1;
  *
  * A radius tied to the model's size would be a stud on a small model and half a
  * baseplate on a large one, and the thing being aimed at is the same size in
- * both cases: a brick. So it scales off the brick instead. 24 LDU is a little
- * over a stud, which is forgiving without reaching a neighbouring slot.
+ * both cases: a brick. So it scales off the brick instead. The floor is a stud
+ * and a half, because the smallest parts would otherwise have to be placed to
+ * within a few units of exactly right, and in build mode there is nowhere else
+ * for a brick to go anyway: snapping early costs nothing, and the nearest slot
+ * still wins.
  */
-const SNAP_MIN_RADIUS = 24;
-const SNAP_RADIUS_FACTOR = 1.25;
+const SNAP_MIN_RADIUS = 30;
+const SNAP_RADIUS_FACTOR = 1.4;
 
 /** How fast a carried brick eases into the slot it is over. */
 const SNAP_LAMBDA = 14;
@@ -825,11 +828,15 @@ export class SceneController {
           assembly.floor + drag.clearance
         );
       }
-      // Aim from where the brick would be sitting, not from where it is being
-      // held. The hover is there so the brick clears the pile on the way over;
-      // counting it as distance would push a small, tall part out of its own
-      // snap radius and make it the hardest thing in the model to place.
-      this.snapProbe.copy(this.dragTarget).setY(this.dragTarget.y - drag.hover);
+      // Aim from the middle of the brick, lowered by however far it is being
+      // carried above the work. The hover is there so the brick clears the pile
+      // on the way over; counting it as distance would push a small, tall part
+      // out of its own snap radius and make it the hardest thing to place.
+      this.snapProbe
+        .copy(brick.localCenter)
+        .applyQuaternion(drag.carry)
+        .add(this.dragTarget);
+      this.snapProbe.y -= drag.hover;
       drag.slot = build.findSlot(
         drag.brickId,
         this.snapProbe,
