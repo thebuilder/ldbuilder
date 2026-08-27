@@ -61,7 +61,7 @@ async function fetchPage(page) {
  * when the first cell parses as a set number, which skips the header and any
  * layout rows without having to know where they are.
  */
-function parsePage(doc) {
+export function parsePage(doc) {
   const sets = [];
   for (const [, row] of doc.matchAll(ROW)) {
     const cells = [...row.matchAll(CELL)]
@@ -83,7 +83,7 @@ function parsePage(doc) {
 }
 
 /** How many sets the list says it has, so the caller can check it got them all. */
-function parseTotal(doc) {
+export function parseTotal(doc) {
   const match = TOTAL.exec(doc);
   return match ? Number(match[1].replaceAll(",", "")) : null;
 }

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "audit": "fallow audit",
+    "audit": "pnpm run test:coverage && fallow audit",
     "build": "next build",
     "check": "ultracite check",
     "dev": "next dev",
@@ -16,6 +16,9 @@
     "ldraw:pack": "node scripts/pack-models.mjs",
     "ldraw:setup": "node scripts/setup-ldraw.mjs",
     "start": "next start",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -35,9 +38,11 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "@types/three": "0.185.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "fallow": "3.19.0",
     "tailwindcss": "4.1.16",
     "typescript": "5.9.3",
-    "ultracite": "7.10.6"
+    "ultracite": "7.10.6",
+    "vitest": "^4.1.11"
   }
 }

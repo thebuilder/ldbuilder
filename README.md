@@ -153,6 +153,30 @@ that does have the library installed.
 
 [mirror]: https://github.com/gkjohnson/ldraw-parts-library
 
+## Tests
+
+```bash
+pnpm test              # 157 tests, about two seconds
+pnpm test:watch
+pnpm test:coverage     # writes coverage/coverage-final.json
+```
+
+They cover the pure logic: the packer's reference-naming rules, the network
+resolver's fallback chain and caching, step synthesis, bag partitioning, the
+search ranking, and the OMR scrapers. That is where the bugs have actually been,
+and it is testable without a GPU. The rendering path (`flatten`, `layout`,
+`loadModel`, `SceneController`) needs a real scene and is not covered here.
+
+One suite checks the committed models rather than the code: every `.mpd` in
+`public/models` must be self-contained and must still match the brick, step and
+part counts in the manifest. That is what catches a bad re-pack getting
+committed, which is the failure that would be invisible until someone opened
+the model.
+
+`pnpm audit` runs the suite with coverage first, because fallow reads
+`coverage-final.json` to score CRAP. Without it that metric just measures the
+absence of tests.
+
 ## How it works
 
 **Flattening.** The loader hands back a nested group tree. That does not work
