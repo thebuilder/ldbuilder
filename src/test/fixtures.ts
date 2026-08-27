@@ -2,6 +2,7 @@ import {
   Box3,
   BoxGeometry,
   Group,
+  type Material,
   Mesh,
   MeshStandardMaterial,
   Object3D,
@@ -190,6 +191,20 @@ export interface PaletteSpec extends BrickSpec {
  * get at the part records on the other side. So the records are built here
  * directly, in the same shape the real loader produces.
  */
+/** One box of a part, between two heights in the part's own downward-Y frame. */
+function slabAt(
+  width: number,
+  depth: number,
+  from: number,
+  to: number,
+  material: Material
+): Mesh {
+  const geometry = new BoxGeometry(width, to - from, depth);
+  geometry.translate(0, (from + to) / 2, 0);
+  geometry.computeBoundingBox();
+  return new Mesh(geometry, material);
+}
+
 export function makePalette(specs: PaletteSpec[]): Palette {
   const byFile = new Map<string, PalettePart>();
   const parts: PalettePart[] = [];
@@ -205,13 +220,16 @@ export function makePalette(specs: PaletteSpec[]): Palette {
     // local Y. Modelling the studs matters: a part that rests on the bounding
     // box rather than on the body sits a stud's height clear of what is under
     // it, and a fixture without studs cannot catch that.
-    const geometry = new BoxGeometry(width, BRICK_HEIGHT + STUD_HEIGHT, depth);
-    geometry.translate(0, (BRICK_HEIGHT - STUD_HEIGHT) / 2, 0);
-    geometry.computeBoundingBox();
+    //
+    // Body and studs are separate boxes, as a real part's are. Fusing them into
+    // one leaves no face at the stud plane, and a part measured column by column
+    // then has no top surface to find between the two.
+    const material = materialFor(spec.colorCode ?? 16);
+    const body = slabAt(width, depth, 0, BRICK_HEIGHT, material);
+    const studs = slabAt(width, depth, -STUD_HEIGHT, 0, material);
 
     const template = new Object3D();
-    const mesh = new Mesh(geometry, materialFor(spec.colorCode ?? 16));
-    template.add(mesh);
+    template.add(body, studs);
     template.updateMatrixWorld(true);
 
     const part: PalettePart = {
@@ -223,7 +241,7 @@ export function makePalette(specs: PaletteSpec[]): Palette {
         depth / 2
       ),
       localCenter: new Vector3(0, (BRICK_HEIGHT - STUD_HEIGHT) / 2, 0),
-      meshes: [mesh],
+      meshes: [body, studs],
       name: spec.partFile ?? `Part ${index}`,
       radius: Math.hypot(width, BRICK_HEIGHT, depth) / 2,
       size: spec.size ?? [1, 1],
