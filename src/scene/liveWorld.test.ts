@@ -54,6 +54,39 @@ describe("LiveWorld", () => {
     live.dispose();
   });
 
+  it("leaves out bricks the build already has in the model", () => {
+    const live = world();
+    const model = makeModel({ bricks: [{}, {}, {}] });
+    const placed = Uint8Array.from([0, 1, 0]);
+
+    // A build started partway into a bag: that slot is filled, so there is
+    // nothing left in the bag to tip out for it.
+    live.pour(model.bags[0], model.bricks, "seed", placed);
+
+    expect(live.looseCount).toBe(2);
+    live.dispose();
+  });
+
+  it("pours the rest where a full pour would have put them", () => {
+    const pile = (placed?: Uint8Array) => {
+      const live = world();
+      const model = makeModel({ bricks: [{}, {}, {}] });
+      live.pour(model.bags[0], model.bricks, "seed", placed);
+      live.sync(model.bricks);
+      const out = model.bricks.map((b) => b.object.position.clone());
+      live.dispose();
+      return out;
+    };
+
+    // Every brick still takes its turn of the random draw, so skipping one
+    // does not shuffle the pile the others land in.
+    const whole = pile();
+    const partial = pile(Uint8Array.from([0, 1, 0]));
+
+    expect(partial[2].x).toBeCloseTo(whole[2].x, 5);
+    expect(partial[2].z).toBeCloseTo(whole[2].z, 5);
+  });
+
   it("pours the same pile for the same seed", () => {
     const settle = (seed: string) => {
       const live = world();

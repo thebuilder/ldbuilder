@@ -614,10 +614,28 @@ export class SceneController {
       matchesModel(save, model.bricks.length, model.steps.length) &&
       (save.step > 0 || save.placed.length > 0);
 
-    if (usable) {
-      this.build.restore(save.step, save.placed);
+    // Two claims about how far in you are: the saved build, and the step you
+    // were just watching. The further one wins. Switching to build mode after
+    // watching thirty steps should hand you step thirty-one rather than an
+    // empty floor, and scrubbing back to look at something should not quietly
+    // throw away a build that had already reached step two hundred.
+    //
+    // The watched step stops one short of the end. Playing a model through and
+    // then pressing build is a normal way to arrive here, and handing back a
+    // finished model with nothing left to do is a dead end; the last step is
+    // not. A build only finishes by being built.
+    const watched = resume ? this.watchedStep(model.steps.length) : 0;
+    const from = usable && save.step >= watched ? save : null;
+
+    if (from) {
+      this.build.restore(from.step, from.placed);
+    } else if (watched > 0) {
+      this.build.restore(watched);
     }
-    this.buildResumed = usable;
+    // Say a build was picked up only when doing so moved you. The notice is
+    // there to explain a jump, and being handed the step the URL already named
+    // is not one.
+    this.buildResumed = from !== null && from.step !== this.input.step;
 
     for (const brick of model.bricks) {
       if (this.build.placed[brick.id] === 1) {
@@ -627,10 +645,19 @@ export class SceneController {
 
     this.step = this.build.step;
     this.activeBag = -1;
-    this.openBuildBag(this.build.bag, !usable);
+    // A resumed build has its pile in the save; anything else starts the bag
+    // it lands in from a fresh pour.
+    this.openBuildBag(this.build.bag, from === null);
 
-    if (usable) {
-      this.restoreLoose(save.loose);
+    if (from) {
+      this.restoreLoose(from.loose);
+    }
+
+    // The step is the build's from here on, so say so upward: the URL, and the
+    // parts list reading off it, would otherwise still be describing whatever
+    // step the watcher had left behind.
+    if (this.step !== this.input.step) {
+      this.callbacks.onStepAdvance?.(this.step);
     }
 
     this.framing = "table";
@@ -640,6 +667,11 @@ export class SceneController {
     this.refreshGhosts();
     this.reportBuild(true);
     pruneBuilds();
+  }
+
+  /** How far a build handed over from the watch flow should start. */
+  private watchedStep(totalSteps: number): number {
+    return Math.min(Math.max(this.input.step, 0), Math.max(totalSteps - 1, 0));
   }
 
   /** Throw the saved build away and start this model again from step one. */
@@ -698,7 +730,7 @@ export class SceneController {
     world.clearLoose();
 
     if (pour) {
-      world.pour(bag, model.bricks, model.slug);
+      world.pour(bag, model.bricks, model.slug, this.build?.placed);
       if (prefersReducedMotion()) {
         // The falling is decorative; the pile is not. Run the solver forward
         // with nothing drawn so the bricks are simply already down.
