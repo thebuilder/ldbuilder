@@ -23,6 +23,21 @@
     //   pnpm exec fallow dupes --save-baseline .fallow-dupes-baseline.json
     "dupesBaseline": ".fallow-dupes-baseline.json"
   },
+  "health": {
+    // CRAP is cyclomatic² × (1 − coverage)³ + cyclomatic. There is no test
+    // suite here, so coverage is 0 and it collapses to cyclomatic² + cyclomatic,
+    // which makes the default ceiling of 30 mean "cyclomatic > 5" - far stricter
+    // than the cyclomatic limit actually configured, and reached by accident
+    // rather than on purpose. Every finding it produced was a function well
+    // inside both real limits.
+    //
+    // 420 is c² + c at the maxCyclomatic of 20, so while coverage is missing
+    // CRAP adds nothing the cyclomatic check does not already say, and the
+    // cyclomatic and cognitive limits below do the gating. Point `coverage` at
+    // an Istanbul report once there are tests and drop this back to 30, at
+    // which point the score starts measuring risk rather than absence.
+    "maxCrap": 420
+  },
   "rules": {
     // Syntactic analysis cannot see `controllerRef.current?.setModel(...)`, so
     // SceneController's public methods look unused. Running with --type-aware
