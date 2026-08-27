@@ -9,9 +9,16 @@ export interface CarryHudProps {
   placed: number;
 }
 
-const KEYS: { keys: string; what: string }[] = [
+interface Key {
+  keys: string;
+  /** Left out for a subassembly, which only turns about the upright. */
+  single?: true;
+  what: string;
+}
+
+const KEYS: Key[] = [
   { keys: "R", what: "Turn" },
-  { keys: "T", what: "Tip" },
+  { keys: "T", single: true, what: "Tip" },
   { keys: "Arrows", what: "Nudge" },
   { keys: "PgUp / PgDn", what: "Raise" },
   { keys: "Esc", what: "Put back" },
@@ -20,6 +27,7 @@ const KEYS: { keys: string; what: string }[] = [
 
 /** What is in hand, and the keys that move it. */
 export function CarryHud({ carrying, placed, loose }: CarryHudProps) {
+  const group = (carrying?.count ?? 1) > 1;
   return (
     <div className="panel pointer-events-auto flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
       {carrying ? (
@@ -29,11 +37,16 @@ export function CarryHud({ carrying, placed, loose }: CarryHudProps) {
             <span className="ml-2 text-faint">
               {colorName(carrying.colorCode)}
             </span>
+            {group ? (
+              <span className="ml-2 text-accent-fg">
+                +<span className="tabular">{carrying.count - 1}</span> attached
+              </span>
+            ) : null}
           </span>
           <span className="readout text-muted">
             Turn{" "}
             <span className="tabular text-ink">{carrying.yaw * 90}&deg;</span>
-            {carrying.tip > 0 ? (
+            {carrying.tip > 0 && !group ? (
               <>
                 {" · Tip "}
                 <span className="tabular text-ink">
@@ -48,7 +61,7 @@ export function CarryHud({ carrying, placed, loose }: CarryHudProps) {
             <span className="readout text-accent-fg">Click to place</span>
           )}
           <dl className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
-            {KEYS.map((row) => (
+            {KEYS.filter((row) => !(group && row.single)).map((row) => (
               <div className="flex items-center gap-1.5" key={row.what}>
                 <dt>
                   <kbd className="readout border border-edge bg-panel-raised px-1 py-0.5 text-faint">
@@ -72,8 +85,8 @@ export function CarryHud({ carrying, placed, loose }: CarryHudProps) {
             ) : null}
           </span>
           <span className="readout ml-auto text-faint">
-            Take a part from the list, press a hotbar key, or click one on the
-            floor to pick it up.
+            Take a part from the list, press a hotbar key, or click a brick to
+            pick it up. Shift-click lifts the whole subassembly.
           </span>
         </>
       )}

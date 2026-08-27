@@ -188,6 +188,7 @@ describe("FreeBuildClient", () => {
         carrying: {
           blocked: false,
           colorCode: 4,
+          count: 1,
           file: "3001.dat",
           name: "Brick 2 x 4",
           nudge: { x: 0, y: 0, z: 0 },

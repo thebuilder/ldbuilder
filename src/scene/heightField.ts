@@ -435,3 +435,93 @@ export function boundsOf(standing: Standing, target: Box3): Box3 {
   );
   return target;
 }
+
+/** A profile, and where it sits relative to whatever it is grouped with. */
+export interface Member {
+  offset: Vector3;
+  profile: Profile;
+}
+
+/**
+ * One profile for a group of parts held together.
+ *
+ * A subassembly lifted in one piece has to answer the same two questions a
+ * single part does, what is under it and would it fit here, and merging its
+ * members into one column grid means it answers them at a single part's cost
+ * rather than at every member's cost against everything still built.
+ *
+ * A member column that straddles two of the merged grid's is counted in both,
+ * which is the same safe-side rounding `each` uses: a group is treated as
+ * filling a shade more than it does rather than a shade less.
+ */
+export function mergeProfiles(members: Member[]): Profile {
+  const [only] = members;
+  if (members.length === 1 && only.offset.lengthSq() === 0) {
+    return only.profile;
+  }
+
+  const bounds: Bounds = {
+    maxX: Number.NEGATIVE_INFINITY,
+    maxZ: Number.NEGATIVE_INFINITY,
+    minX: Number.POSITIVE_INFINITY,
+    minZ: Number.POSITIVE_INFINITY,
+  };
+  for (const { offset, profile } of members) {
+    if (profile.cols === 0) {
+      continue;
+    }
+    const x = offset.x + profile.anchorX;
+    const z = offset.z + profile.anchorZ;
+    bounds.minX = Math.min(bounds.minX, x);
+    bounds.maxX = Math.max(bounds.maxX, x + profile.cols * COLUMN);
+    bounds.minZ = Math.min(bounds.minZ, z);
+    bounds.maxZ = Math.max(bounds.maxZ, z + profile.rows * COLUMN);
+  }
+
+  const merged = blank(bounds);
+  if (merged.cols === 0) {
+    return merged;
+  }
+  for (const member of members) {
+    fold(merged, member);
+  }
+  return merged;
+}
+
+function fold(merged: Profile, { offset, profile }: Member): void {
+  for (let row = 0; row < profile.rows; row += 1) {
+    const rows = overlap(
+      offset.z + profile.anchorZ + row * COLUMN - merged.anchorZ,
+      merged.rows
+    );
+    if (!rows) {
+      continue;
+    }
+    for (let col = 0; col < profile.cols; col += 1) {
+      const at = row * profile.cols + col;
+      if (!Number.isFinite(profile.bottom[at])) {
+        continue;
+      }
+      const cols = overlap(
+        offset.x + profile.anchorX + col * COLUMN - merged.anchorX,
+        merged.cols
+      );
+      if (!cols) {
+        continue;
+      }
+      for (let into = rows.from; into <= rows.to; into += 1) {
+        for (let across = cols.from; across <= cols.to; across += 1) {
+          const cell = into * merged.cols + across;
+          merged.bottom[cell] = Math.min(
+            merged.bottom[cell],
+            offset.y + profile.bottom[at]
+          );
+          merged.top[cell] = Math.max(
+            merged.top[cell],
+            offset.y + profile.top[at]
+          );
+        }
+      }
+    }
+  }
+}

@@ -5,6 +5,7 @@ import {
   COLUMN,
   contactHeight,
   lowestOf,
+  mergeProfiles,
   type Profile,
   profileOf,
   profilesCollide,
@@ -174,5 +175,50 @@ describe("profilesCollide", () => {
     expect(profilesCollide(solid(), new Vector3(40, 24, 0), support)).toBe(
       false
     );
+  });
+});
+
+describe("mergeProfiles", () => {
+  it("hands a single part its own profile back", () => {
+    const one = solid();
+
+    expect(mergeProfiles([{ offset: new Vector3(), profile: one }])).toBe(one);
+  });
+
+  it("measures a stack as one shape running the height of both", () => {
+    // The upper brick's origin is 24 above the lower one's, so its solid runs
+    // from the lower one's top face to a brick above that.
+    const merged = mergeProfiles([
+      { offset: new Vector3(), profile: solid() },
+      { offset: new Vector3(0, 24, 0), profile: solid() },
+    ]);
+
+    expect(merged.cols).toBe(4);
+    expect(merged.rows).toBe(8);
+    expect(at(merged, 0, 0).bottom).toBeCloseTo(-24, 6);
+    expect(at(merged, 0, 0).top).toBeCloseTo(24, 6);
+  });
+
+  it("grows the grid to cover a part set off to one side", () => {
+    const merged = mergeProfiles([
+      { offset: new Vector3(), profile: solid() },
+      { offset: new Vector3(40, 0, 0), profile: solid() },
+    ]);
+
+    expect(merged.cols).toBe(8);
+    expect(merged.anchorX).toBe(-20);
+    // The column over the second brick is solid, and the first knows nothing
+    // about it: a merged profile is the group, not the part that was clicked.
+    expect(at(merged, 50, 0).top).toBeCloseTo(0, 6);
+  });
+
+  it("leaves a column no member covers empty", () => {
+    const merged = mergeProfiles([
+      { offset: new Vector3(), profile: solid() },
+      { offset: new Vector3(0, 0, 120), profile: solid() },
+    ]);
+
+    expect(at(merged, 0, 50).top).toBe(Number.NEGATIVE_INFINITY);
+    expect(at(merged, 0, 0).top).toBeCloseTo(0, 6);
   });
 });
