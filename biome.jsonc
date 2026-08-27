@@ -27,9 +27,11 @@
       "!ldraw-library",
       "!demo-models",
       "!public/models",
-      // Generated: reformatting them only creates churn on the next regenerate.
+      // Generated: reformatting it only creates churn on the next regenerate.
       "!public/omr-index.json",
-      "!.fallow-dupes-baseline.json"
+      // Captured third-party markup, kept verbatim so the parser is tested
+      // against the real thing. Nothing in it is ours to lint.
+      "!scripts/lib/__fixtures__"
     ]
   }
 }

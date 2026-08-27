@@ -42,7 +42,7 @@ export function normalizeSetId(id) {
 }
 
 /** Read the attribution the CCAL licence requires, plus what the gallery shows. */
-function readMetadata(text) {
+export function readMetadata(text) {
   const license = LICENSE.exec(text)?.[1]?.trim() ?? null;
   return {
     author: AUTHOR.exec(text)?.[1]?.trim() ?? null,

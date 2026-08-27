@@ -79,9 +79,11 @@ function synthesize(bricks: Brick[]): void {
     return a.minY - b.minY || a.id - b.id;
   });
 
-  const perStep = Math.ceil(ordered.length / target);
+  // Spread across `target` steps rather than chunking by a computed size.
+  // Chunking rounds the size up and so can undershoot: six bricks at a target
+  // of four gave three steps, below the minimum this is supposed to hold to.
   ordered.forEach((brick, index) => {
-    brick.step = Math.floor(index / perStep);
+    brick.step = Math.floor((index * target) / ordered.length);
   });
 }
 
