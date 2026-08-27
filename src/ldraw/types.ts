@@ -55,8 +55,38 @@ export interface Brick {
   /** Bounding sphere radius, used to space out the floor scatter. */
   radius: number;
   step: number;
+  /**
+   * Index into `ModelData.subassemblies`, or -1 when the brick is built
+   * straight into the model.
+   */
+  subassembly: number;
   /** Enclosing submodel file names, outermost first. Empty for the main model. */
   submodelPath: string[];
+}
+
+/**
+ * A submodel occurrence that gets built off to the side and then attached.
+ *
+ * This is what an instruction booklet does when it takes you off to a corner of
+ * the page to build a subassembly before showing you where it goes, and it is
+ * the only honest way to show one: an LDraw file records every brick at its
+ * final position in the finished model, so replaying the steps literally builds
+ * a subassembly in mid-air, inside the silhouette of a model that does not
+ * exist yet.
+ */
+export interface Subassembly {
+  /** Every brick in it, nested submodels included. */
+  brickIds: number[];
+  /** Step at which the last of it goes on, and so the step it slides in during. */
+  installStep: number;
+  /** Submodel file name, without its extension. */
+  label: string;
+  /**
+   * Displacement from where the bricks belong to where they are built, applied
+   * to every brick in the subassembly. A pure translation, so the thing being
+   * built off-model is recognisably the thing that will slot in.
+   */
+  offset: Vector3;
 }
 
 export interface StepInfo {
@@ -112,6 +142,8 @@ export interface ModelData {
   steps: StepInfo[];
   /** True when no `0 STEP` metas existed and the order was inferred from height. */
   stepsAreSynthetic: boolean;
+  /** Submodel occurrences built off-model. Empty when nothing qualifies. */
+  subassemblies: Subassembly[];
   submodels: SubmodelNode;
   title: string;
 }

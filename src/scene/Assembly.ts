@@ -9,8 +9,10 @@ import {
 import type { Brick, ModelData, ViewMode } from "@/ldraw/types";
 import {
   clamp01,
+  easeInOutCubic,
   easeOutBackSoft,
   easeOutBounce,
+  phase,
   staggered,
 } from "./animation";
 import { MaterialVariants, type RenderState } from "./materials";
@@ -41,6 +43,18 @@ const IMPACT_AT = 1 / 2.75;
 
 /** How high a brick arcs on its way from the floor into the model. */
 const ASSEMBLE_ARC_FACTOR = 0.22;
+
+/**
+ * How much of the install step goes on finishing the subassembly before it
+ * starts moving onto the model.
+ *
+ * The last bricks of a subassembly are placed in the same step it goes on in,
+ * so that step has to do two things in order: finish it, then fit it. Anything
+ * else in that step (the parent model's own bricks, which LDraw puts in the
+ * same step as the subassembly reference) keeps the whole step to arrive in, so
+ * it lands as the subassembly does.
+ */
+const INSTALL_AT = 0.5;
 
 /** Everything a build-mode frame needs from outside the assembly. */
 export interface BuildFrame {
@@ -75,6 +89,10 @@ interface FrameSetup {
   bagIndex: number;
   completed: number;
   explodeDistance: number;
+  /** Subassemblies whose last brick goes on in the step being worked. */
+  installing: Set<number>;
+  /** How far through the step the subassemblies installing in it have moved. */
+  installProgress: number;
   placeIndex: Map<number, number>;
   pourIndex: Map<number, number>;
   sliceActive: boolean;
@@ -107,6 +125,12 @@ export class Assembly {
 
   private readonly modelCenter = new Vector3();
   private readonly explodeDir: Vector3[] = [];
+  /**
+   * Where each brick goes when its step places it: off to the side for a brick
+   * in a subassembly, and its final position for everything else, so the
+   * ordinary case costs one array read rather than a branch.
+   */
+  private readonly placedPos: Vector3[] = [];
   private readonly modelRadius: number;
   private readonly pourHeight: number;
   private readonly floorY: number;
@@ -114,6 +138,9 @@ export class Assembly {
 
   /** Which bag's bricks are currently in the scene graph. */
   private activeBag = -1;
+
+  /** Subassemblies indexed by the step they move onto the model during. */
+  private readonly installingAt = new Map<number, Set<number>>();
 
   /** Baked drop for the open bag. Only one is kept: they are ~500KB each. */
   private recording: SettleRecording | null = null;
@@ -138,6 +165,13 @@ export class Assembly {
       this.renderState.push("normal");
       this.inScene.push(false);
 
+      const subassembly = model.subassemblies[brick.subassembly];
+      this.placedPos.push(
+        subassembly
+          ? brick.builtPose.position.clone().add(subassembly.offset)
+          : brick.builtPose.position
+      );
+
       const dir = brick.center.clone().sub(this.modelCenter);
       // A brick sitting exactly at the centre has no direction to explode
       // along, so give it a deterministic one rather than a zero vector.
@@ -148,6 +182,15 @@ export class Assembly {
 
       // Bricks start detached. `setActiveBag` adds only what is needed.
       brick.object.removeFromParent();
+    }
+
+    for (const [index, subassembly] of model.subassemblies.entries()) {
+      const at = this.installingAt.get(subassembly.installStep);
+      if (at) {
+        at.add(index);
+      } else {
+        this.installingAt.set(subassembly.installStep, new Set([index]));
+      }
     }
 
     // How far the scatter reaches, which together with the model's height is
@@ -342,11 +385,15 @@ export class Assembly {
 
     const explodeAmount = state.mode === "explode" ? state.explode : 0;
 
+    const installing = this.installingAt.get(completed) ?? NO_INSTALLS;
+
     return {
       bagBrickCount: bag?.brickIds.length ?? bricks.length,
       bagIndex,
       completed,
       explodeDistance: this.modelRadius * 1.1 * explodeAmount,
+      installing,
+      installProgress: easeInOutCubic(phase(state.stepProgress, INSTALL_AT, 1)),
       placeIndex,
       pourIndex,
       sliceActive: state.mode === "slice" && state.slice < 0.999,
@@ -356,7 +403,13 @@ export class Assembly {
     };
   }
 
-  /** 0 while a brick is still in the pile, 1 once it is in place. */
+  /**
+   * 0 while a brick is still in the pile, 1 once its step has placed it.
+   *
+   * "Placed" means at the position its step puts it, which for a brick in a
+   * subassembly is the staging area rather than the model. Moving from there
+   * onto the model is `installProgress`, a separate leg.
+   */
   private static assemblyProgress(
     brick: Brick,
     frame: FrameSetup,
@@ -368,10 +421,33 @@ export class Assembly {
     if (brick.bag !== frame.bagIndex || brick.step !== frame.completed) {
       return 0;
     }
+    // A subassembly finishing in this step has to be finished before it can be
+    // fitted, so its last bricks go on in the half of the step before the move.
+    const local = frame.installing.has(brick.subassembly)
+      ? phase(stepProgress, 0, INSTALL_AT)
+      : stepProgress;
     const index = frame.placeIndex.get(brick.id) ?? 0;
-    return easeOutBackSoft(
-      staggered(stepProgress, index, frame.stepIds.length)
-    );
+    return easeOutBackSoft(staggered(local, index, frame.stepIds.length));
+  }
+
+  /**
+   * 0 while a subassembly is still off to the side, 1 once it is on the model.
+   *
+   * Always 0 for a brick that is not in one, which is what makes the ordinary
+   * path fall through to the single-leg flight from the floor.
+   */
+  private installProgress(brick: Brick, frame: FrameSetup): number {
+    if (brick.subassembly < 0) {
+      return 0;
+    }
+    if (frame.installing.has(brick.subassembly)) {
+      return frame.installProgress;
+    }
+    // The whole subassembly moves together, so this turns on the subassembly's
+    // install step and not on the brick's own step: a brick placed early in a
+    // subassembly waits off to the side for the rest of it.
+    const subassembly = this.model.subassemblies[brick.subassembly];
+    return subassembly && frame.completed > subassembly.installStep ? 1 : 0;
   }
 
   update(state: AssemblyState): void {
@@ -390,7 +466,7 @@ export class Assembly {
 
       const t = Assembly.assemblyProgress(brick, frame, state.stepProgress);
 
-      this.poseBrick(brick, t, {
+      this.poseBrick(brick, t, this.installProgress(brick, frame), {
         explodeDistance: frame.explodeDistance,
         pourCount: frame.bagBrickCount,
         pourIndex: frame.pourIndex.get(brick.id) ?? 0,
@@ -412,6 +488,7 @@ export class Assembly {
   private poseBrick(
     brick: Brick,
     t: number,
+    install: number,
     opts: {
       pourProgress: number;
       pourIndex: number;
@@ -422,9 +499,31 @@ export class Assembly {
     const { object } = brick;
     const floor = brick.floorPose;
     const built = brick.builtPose;
+    // Where this brick's own step leaves it. Identical to the built position
+    // unless the brick belongs to a subassembly, so the two legs below collapse
+    // to the one flight from the floor for most of any model.
+    const placed = this.placedPos[brick.id];
+
+    // Second leg: riding onto the model with the rest of its subassembly. The
+    // move is a translation, so the brick is already at its final orientation.
+    if (install > 0) {
+      if (install >= 1) {
+        object.position.copy(built.position);
+      } else {
+        object.position.lerpVectors(placed, built.position, install);
+      }
+      object.quaternion.copy(built.quaternion);
+      if (opts.explodeDistance > 0) {
+        object.position.addScaledVector(
+          this.explodeDir[brick.id],
+          opts.explodeDistance
+        );
+      }
+      return;
+    }
 
     if (t >= 1) {
-      object.position.copy(built.position);
+      object.position.copy(placed);
       object.quaternion.copy(built.quaternion);
       if (opts.explodeDistance > 0) {
         object.position.addScaledVector(
@@ -444,7 +543,7 @@ export class Assembly {
     // In flight from the floor into the model. The shallow arc is what
     // separates being lifted and set down from being dragged across the table.
     const from = this.scratchPos.copy(floor.position);
-    object.position.lerpVectors(from, built.position, t);
+    object.position.lerpVectors(from, placed, t);
     object.position.y +=
       Math.sin(Math.PI * t) * this.modelRadius * ASSEMBLE_ARC_FACTOR;
 
@@ -667,6 +766,7 @@ function swap<T>(list: T[], a: number, b: number): void {
 }
 
 const EMPTY_IDS: number[] = [];
+const NO_INSTALLS: Set<number> = new Set();
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);

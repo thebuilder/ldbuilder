@@ -48,11 +48,31 @@ function fileNameOf(object: Object3D): string {
   return object.name || "unknown";
 }
 
+/**
+ * One *occurrence* of a submodel, as opposed to `SubmodelNode`, which is one
+ * submodel *file*.
+ *
+ * The gatehouse references tower.ldr four times. Those are one node in the
+ * submodel tree, because isolating "the towers" should light up all four, but
+ * they are four separate things to build, each with its own steps and its own
+ * place to be built. Staging needs the occurrences; the panel needs the files.
+ */
+export interface InstanceNode {
+  /** Bricks directly in this occurrence, excluding those in nested ones. */
+  brickIds: number[];
+  children: number[];
+  name: string;
+  /** Index into the instances array. -1 for an occurrence at the top level. */
+  parent: number;
+}
+
 export interface FlattenResult {
   bounds: Box3;
   bricks: Brick[];
   /** Bricks whose geometry was empty; usually a sign of an incomplete pack. */
   emptyBricks: number;
+  /** Every submodel occurrence, parents before children. */
+  instances: InstanceNode[];
   root: Group;
   submodels: SubmodelNode;
 }
@@ -76,6 +96,8 @@ export function flattenModel(
   root.name = "assembly";
 
   interface Collected {
+    /** Index into `instances`, or -1 when the brick sits in the main model. */
+    instance: number;
     matrix: Matrix4;
     object: Object3D;
     step: number;
@@ -83,6 +105,7 @@ export function flattenModel(
   }
 
   const collected: Collected[] = [];
+  const instances: InstanceNode[] = [];
   const submodelRoot: SubmodelNode = {
     brickIds: [],
     children: [],
@@ -117,7 +140,8 @@ export function flattenModel(
   function walk(
     object: Object3D,
     submodelPath: string[],
-    inheritedStep: number
+    inheritedStep: number,
+    instance: number
   ): void {
     const step =
       typeof object.userData.buildingStep === "number"
@@ -126,6 +150,7 @@ export function flattenModel(
 
     if (object !== raw && isBrickGroup(object)) {
       collected.push({
+        instance,
         matrix: new Matrix4().multiplyMatrices(
           LDRAW_TO_YUP,
           object.matrixWorld
@@ -140,20 +165,30 @@ export function flattenModel(
     // A non-brick Group with its own file name is a submodel boundary. The
     // root itself is the main model, so it does not extend the path.
     let nextPath = submodelPath;
+    let nextInstance = instance;
     if (object !== raw && (object as Group).isGroup) {
       const name = fileNameOf(object);
       if (name !== "unknown") {
         nextPath = [...submodelPath, name];
         nodeFor(nextPath);
+
+        nextInstance = instances.length;
+        instances.push({
+          brickIds: [],
+          children: [],
+          name,
+          parent: instance,
+        });
+        instances[instance]?.children.push(nextInstance);
       }
     }
 
     for (const child of object.children) {
-      walk(child, nextPath, step);
+      walk(child, nextPath, step, nextInstance);
     }
   }
 
-  walk(raw, [], 0);
+  walk(raw, [], 0, -1);
 
   const bricks: Brick[] = [];
   const position = new Vector3();
@@ -227,10 +262,13 @@ export function flattenModel(
       partName: partNames[partFile.toLowerCase()] ?? partFile,
       radius: 0,
       step: item.step,
+      // Filled in by the subassembly pass, which needs the steps first.
+      subassembly: -1,
       submodelPath: item.submodelPath,
     });
 
     nodeFor(item.submodelPath).brickIds.push(id);
+    instances[item.instance]?.brickIds.push(id);
   }
 
   root.updateMatrixWorld(true);
@@ -296,7 +334,14 @@ export function flattenModel(
   }
   total(submodelRoot);
 
-  return { bounds, bricks, emptyBricks, root, submodels: submodelRoot };
+  return {
+    bounds,
+    bricks,
+    emptyBricks,
+    instances,
+    root,
+    submodels: submodelRoot,
+  };
 }
 
 /** Group bricks into a bill of materials, keyed by part and colour. */

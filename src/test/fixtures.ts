@@ -12,7 +12,7 @@ import {
 import { computeBags } from "@/ldraw/bags";
 import type { Palette, PalettePart } from "@/ldraw/palette";
 import { computeSteps } from "@/ldraw/steps";
-import type { Brick, ModelData, Pose } from "@/ldraw/types";
+import type { Brick, ModelData, Pose, Subassembly } from "@/ldraw/types";
 
 /**
  * A model built from a description rather than from an LDraw file.
@@ -38,6 +38,8 @@ export interface BrickSpec {
   /** Stud footprint, defaulting to a 2x4. */
   size?: [number, number];
   step?: number;
+  /** Index into the model's subassemblies; -1 to build straight into place. */
+  subassembly?: number;
 }
 
 /**
@@ -119,6 +121,7 @@ export function makeBrick(id: number, spec: BrickSpec = {}): Brick {
     partName: spec.partFile ?? "Brick 2 x 4",
     radius: Math.hypot(width, BRICK_HEIGHT, depth) / 2,
     step: spec.step ?? 0,
+    subassembly: spec.subassembly ?? -1,
     submodelPath: [],
   };
 }
@@ -126,6 +129,7 @@ export function makeBrick(id: number, spec: BrickSpec = {}): Brick {
 export interface ModelSpec {
   bricks: BrickSpec[];
   slug?: string;
+  subassemblies?: Subassembly[];
   title?: string;
 }
 
@@ -167,6 +171,7 @@ export function makeModel(spec: ModelSpec): ModelData {
     smoothNormals: true,
     steps,
     stepsAreSynthetic: synthetic,
+    subassemblies: spec.subassemblies ?? [],
     submodels: {
       brickIds: bricks.map((brick) => brick.id),
       children: [],
