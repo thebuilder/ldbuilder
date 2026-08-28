@@ -168,26 +168,39 @@ export async function loadModel(options: LoadModelOptions): Promise<ModelData> {
   };
 }
 
+interface Disposable {
+  dispose: () => void;
+}
+
+/**
+ * Add whatever a mesh has on `material` to `into`.
+ *
+ * A mesh carries either one material or an array of them, and both shapes have
+ * to end up in the same set: disposing is per resource, and a material shared
+ * between meshes must only be disposed once.
+ */
+function collectMaterials(material: unknown, into: Set<Disposable>): void {
+  if (Array.isArray(material)) {
+    for (const item of material) {
+      into.add(item as Disposable);
+    }
+    return;
+  }
+  if (material) {
+    into.add(material as Disposable);
+  }
+}
+
 export function disposeModel(model: ModelData): void {
-  const geometries = new Set<{ dispose: () => void }>();
-  const materials = new Set<{ dispose: () => void }>();
+  const geometries = new Set<Disposable>();
+  const materials = new Set<Disposable>();
 
   model.root.traverse((object) => {
-    const mesh = object as {
-      geometry?: { dispose: () => void };
-      material?: unknown;
-    };
+    const mesh = object as { geometry?: Disposable; material?: unknown };
     if (mesh.geometry) {
       geometries.add(mesh.geometry);
     }
-    const { material } = mesh;
-    if (Array.isArray(material)) {
-      for (const item of material) {
-        materials.add(item as { dispose: () => void });
-      }
-    } else if (material) {
-      materials.add(material as { dispose: () => void });
-    }
+    collectMaterials(mesh.material, materials);
   });
 
   for (const geometry of geometries) {

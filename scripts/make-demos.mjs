@@ -227,6 +227,42 @@ function splitFiles(text) {
  * reference would need the box rotated with it, and silently treating one as
  * axis-aligned would make the check lie, so it throws instead.
  */
+/** Every type-1 line in `body`, resolved into the frame its parent sits in. */
+function referencesIn(body, name, ox, oy, oz) {
+  const out = [];
+  for (const line of body) {
+    const trimmed = line.trim();
+    const match = REF_LINE.exec(trimmed);
+    if (!match) {
+      continue;
+    }
+    const [, , sx, sy, sz, target] = match;
+    if (!trimmed.includes(IDENTITY)) {
+      throw new Error(
+        `${name} rotates ${target}; validation cannot check that`
+      );
+    }
+    out.push({
+      target,
+      x: ox + Number(sx),
+      y: oy + Number(sy),
+      z: oz + Number(sz),
+    });
+  }
+  return out;
+}
+
+/** The space one placed part occupies. */
+const boxOf = (part, placed, trail) => ({
+  bottom: placed.y + part.h,
+  name: `${trail}${placed.target}`,
+  top: placed.y,
+  x0: placed.x - part.x,
+  x1: placed.x + part.x,
+  z0: placed.z - part.z,
+  z1: placed.z + part.z,
+});
+
 function placements(text) {
   const files = splitFiles(text);
   const [rootName] = [...files.keys()];
@@ -237,35 +273,14 @@ function placements(text) {
     if (!body) {
       throw new Error(`${name} is referenced but not in the file`);
     }
-    for (const line of body) {
-      const match = REF_LINE.exec(line.trim());
-      if (!match) {
-        continue;
-      }
-      const [, , sx, sy, sz, target] = match;
-      const x = ox + Number(sx);
-      const y = oy + Number(sy);
-      const z = oz + Number(sz);
-      if (!line.trim().includes(IDENTITY)) {
-        throw new Error(
-          `${name} rotates ${target}; validation cannot check that`
-        );
-      }
-
-      const part = PARTS[target.toLowerCase()];
+    for (const placed of referencesIn(body, name, ox, oy, oz)) {
+      const target = placed.target.toLowerCase();
+      const part = PARTS[target];
       if (part) {
-        out.push({
-          bottom: y + part.h,
-          name: `${trail}${target}`,
-          top: y,
-          x0: x - part.x,
-          x1: x + part.x,
-          z0: z - part.z,
-          z1: z + part.z,
-        });
+        out.push(boxOf(part, placed, trail));
         continue;
       }
-      walk(target.toLowerCase(), x, y, z, `${trail}${target}/`);
+      walk(target, placed.x, placed.y, placed.z, `${trail}${placed.target}/`);
     }
   };
 
@@ -313,15 +328,19 @@ function offGrid(parts) {
     );
 }
 
+/** True when two parts overlap in plan and their height ranges cross. */
+const sharesSpace = (a, b) =>
+  overlaps(a, b) && a.top < b.bottom && b.top < a.bottom;
+
 /** No two parts share any space. */
 function collisions(parts) {
   const problems = [];
   for (let i = 0; i < parts.length; i += 1) {
     for (let j = i + 1; j < parts.length; j += 1) {
-      const a = parts[i];
-      const b = parts[j];
-      if (overlaps(a, b) && a.top < b.bottom && b.top < a.bottom) {
-        problems.push(`${a.name} and ${b.name} occupy the same space`);
+      if (sharesSpace(parts[i], parts[j])) {
+        problems.push(
+          `${parts[i].name} and ${parts[j].name} occupy the same space`
+        );
       }
     }
   }

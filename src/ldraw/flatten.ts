@@ -86,24 +86,32 @@ export interface FlattenResult {
  * absolute rather than relative to a submodel that is itself moving. So the
  * nesting is flattened away and the submodel tree is recorded separately.
  */
-export function flattenModel(
-  raw: Object3D,
-  partNames: Record<string, string>
-): FlattenResult {
-  raw.updateMatrixWorld(true);
+/** One brick found by the walk, before it becomes a `Brick`. */
+interface Collected {
+  /** Index into `instances`, or -1 when the brick sits in the main model. */
+  instance: number;
+  matrix: Matrix4;
+  object: Object3D;
+  step: number;
+  submodelPath: string[];
+}
 
-  const root = new Group();
-  root.name = "assembly";
+interface Collection {
+  collected: Collected[];
+  instances: InstanceNode[];
+  /** The submodel-file node for a path, created on first use. */
+  nodeFor: (path: string[]) => SubmodelNode;
+  submodelRoot: SubmodelNode;
+}
 
-  interface Collected {
-    /** Index into `instances`, or -1 when the brick sits in the main model. */
-    instance: number;
-    matrix: Matrix4;
-    object: Object3D;
-    step: number;
-    submodelPath: string[];
-  }
-
+/**
+ * Walk the loaded hierarchy once, recording every brick with where it came
+ * from: its step, its submodel path, and which occurrence of that submodel.
+ *
+ * Collect first, re-parent second. The caller re-parents each brick onto a flat
+ * root, which mutates the very children arrays this is iterating.
+ */
+function collectBricks(raw: Object3D): Collection {
   const collected: Collected[] = [];
   const instances: InstanceNode[] = [];
   const submodelRoot: SubmodelNode = {
@@ -135,8 +143,34 @@ export function flattenModel(
     return node;
   }
 
-  // Collect first, re-parent second: re-parenting mutates the children arrays
-  // we would otherwise be iterating.
+  /**
+   * Enter a submodel: one more node in the file tree, and one more occurrence.
+   * Returns the path and occurrence its children belong to, which is the
+   * unchanged pair for anything that is not a submodel boundary.
+   */
+  function descend(
+    object: Object3D,
+    submodelPath: string[],
+    instance: number
+  ): [string[], number] {
+    // The root itself is the main model, so it does not extend the path.
+    if (object === raw || !(object as Group).isGroup) {
+      return [submodelPath, instance];
+    }
+    const name = fileNameOf(object);
+    if (name === "unknown") {
+      return [submodelPath, instance];
+    }
+
+    const path = [...submodelPath, name];
+    nodeFor(path);
+
+    const next = instances.length;
+    instances.push({ brickIds: [], children: [], name, parent: instance });
+    instances[instance]?.children.push(next);
+    return [path, next];
+  }
+
   function walk(
     object: Object3D,
     submodelPath: string[],
@@ -162,33 +196,69 @@ export function flattenModel(
       return;
     }
 
-    // A non-brick Group with its own file name is a submodel boundary. The
-    // root itself is the main model, so it does not extend the path.
-    let nextPath = submodelPath;
-    let nextInstance = instance;
-    if (object !== raw && (object as Group).isGroup) {
-      const name = fileNameOf(object);
-      if (name !== "unknown") {
-        nextPath = [...submodelPath, name];
-        nodeFor(nextPath);
-
-        nextInstance = instances.length;
-        instances.push({
-          brickIds: [],
-          children: [],
-          name,
-          parent: instance,
-        });
-        instances[instance]?.children.push(nextInstance);
-      }
-    }
-
+    const [nextPath, nextInstance] = descend(object, submodelPath, instance);
     for (const child of object.children) {
       walk(child, nextPath, step, nextInstance);
     }
   }
 
   walk(raw, [], 0, -1);
+  return { collected, instances, nodeFor, submodelRoot };
+}
+
+/** Scratch for `measureCollider`, which runs once per brick of every model. */
+const localBox = new Box3();
+const geometryBox = new Box3();
+const toLocal = new Matrix4();
+const inverse = new Matrix4();
+const size = new Vector3();
+
+/**
+ * Measure the brick's own box, in its own space, and record it as the collider.
+ *
+ * The world box taken alongside this is axis-aligned in assembly space, so it
+ * changes shape with the brick's orientation and is useless to drop. This one
+ * is constant whichever way the brick is turned, and the right size.
+ */
+function measureCollider(brick: Brick): void {
+  localBox.makeEmpty();
+  inverse.copy(brick.object.matrixWorld).invert();
+
+  for (const mesh of brick.meshes) {
+    if (!mesh.geometry.boundingBox) {
+      mesh.geometry.computeBoundingBox();
+    }
+    const source = mesh.geometry.boundingBox;
+    if (!source) {
+      continue;
+    }
+    toLocal.multiplyMatrices(inverse, mesh.matrixWorld);
+    geometryBox.copy(source).applyMatrix4(toLocal);
+    localBox.union(geometryBox);
+  }
+
+  if (localBox.isEmpty()) {
+    return;
+  }
+  localBox.getSize(size);
+  brick.halfExtents.set(
+    Math.max(size.x / 2, 0.5),
+    Math.max(size.y / 2, 0.5),
+    Math.max(size.z / 2, 0.5)
+  );
+  localBox.getCenter(brick.localCenter);
+}
+
+export function flattenModel(
+  raw: Object3D,
+  partNames: Record<string, string>
+): FlattenResult {
+  raw.updateMatrixWorld(true);
+
+  const root = new Group();
+  root.name = "assembly";
+
+  const { collected, instances, nodeFor, submodelRoot } = collectBricks(raw);
 
   const bricks: Brick[] = [];
   const position = new Vector3();
@@ -279,12 +349,6 @@ export function flattenModel(
   const sphere = new Sphere();
   let emptyBricks = 0;
 
-  const localBox = new Box3();
-  const geometryBox = new Box3();
-  const toLocal = new Matrix4();
-  const inverse = new Matrix4();
-  const size = new Vector3();
-
   for (const brick of bricks) {
     box.setFromObject(brick.object, true);
     if (box.isEmpty()) {
@@ -298,32 +362,7 @@ export function flattenModel(
     brick.maxY = box.max.y;
     bounds.union(box);
 
-    // The box above is axis-aligned in assembly space, so it changes shape with
-    // the brick's orientation and is useless as a collider. This one is in the
-    // brick's own space: constant, and the right size to drop.
-    localBox.makeEmpty();
-    inverse.copy(brick.object.matrixWorld).invert();
-    for (const mesh of brick.meshes) {
-      if (!mesh.geometry.boundingBox) {
-        mesh.geometry.computeBoundingBox();
-      }
-      const source = mesh.geometry.boundingBox;
-      if (!source) {
-        continue;
-      }
-      toLocal.multiplyMatrices(inverse, mesh.matrixWorld);
-      geometryBox.copy(source).applyMatrix4(toLocal);
-      localBox.union(geometryBox);
-    }
-    if (!localBox.isEmpty()) {
-      localBox.getSize(size);
-      brick.halfExtents.set(
-        Math.max(size.x / 2, 0.5),
-        Math.max(size.y / 2, 0.5),
-        Math.max(size.z / 2, 0.5)
-      );
-      localBox.getCenter(brick.localCenter);
-    }
+    measureCollider(brick);
   }
 
   function total(node: SubmodelNode): number {
