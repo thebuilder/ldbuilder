@@ -45,6 +45,8 @@ function countReferences(text: string): number {
 Cache.enabled = true;
 
 export interface LoadModelOptions {
+  /** Attribution for the model itself. See ModelData.credit. */
+  credit?: string | null;
   /** Brick count from the manifest, used to sanity-check the flatten pass. */
   expectedBricks?: number | null;
   onProgress?: (progress: LoadProgress) => void;
@@ -59,7 +61,15 @@ export interface LoadModelOptions {
 }
 
 export async function loadModel(options: LoadModelOptions): Promise<ModelData> {
-  const { slug, title, url, text, expectedBricks = null, onProgress } = options;
+  const {
+    slug,
+    title,
+    url,
+    text,
+    credit = null,
+    expectedBricks = null,
+    onProgress,
+  } = options;
   const report = (progress: LoadProgress) => onProgress?.(progress);
   const timer = stopwatch();
 
@@ -156,6 +166,7 @@ export async function loadModel(options: LoadModelOptions): Promise<ModelData> {
     bom,
     bounds,
     bricks,
+    credit,
     expectedBricks,
     root,
     slug,

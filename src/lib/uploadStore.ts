@@ -7,6 +7,8 @@
  * the user to drop the file again rather than showing a blank canvas.
  */
 export interface UploadedModel {
+  /** Attribution for the model itself, shown in the viewer. See ModelData.credit. */
+  credit?: string | null;
   /** Parts that could not be resolved and were left out of the build. */
   missingParts?: string[];
   partNames: Record<string, string>;

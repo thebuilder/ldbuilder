@@ -193,6 +193,64 @@ describe("packModel", () => {
   });
 });
 
+describe("packModel attribution", () => {
+  // Inlining part source is what makes a packed model a derivative work under
+  // LDraw's own rule, and CC BY asks a derivative to say it changed the work.
+  it("notes that the model was modified, and how", async () => {
+    const { mpd } = await pack(ref("3001.dat"), { "3001.dat": "0 Brick" });
+
+    expect(mpd).toContain("0 // Repacked for the web.");
+    expect(mpd).toContain("https://creativecommons.org/licenses/by/4.0/");
+  });
+
+  it("puts the notice after the header, not inside it", async () => {
+    // A header is read positionally: description, Name, Author, then the metas.
+    // A comment landing in the middle of that displaces every line after it.
+    const { mpd } = await pack(
+      [
+        "0 A Model",
+        "0 Name: model.ldr",
+        "0 Author: Someone",
+        ref("3001.dat"),
+      ].join("\n"),
+      { "3001.dat": "0 Brick" }
+    );
+    const lines = mpd.split("\n");
+
+    expect(lines.slice(0, 4)).toEqual([
+      "0 FILE model.ldr",
+      "0 A Model",
+      "0 Name: model.ldr",
+      "0 Author: Someone",
+    ]);
+    expect(lines[4]).toContain("0 // Repacked");
+  });
+
+  it("notes it once, on the root, not on every inlined part", async () => {
+    const { mpd } = await pack(ref("3001.dat"), {
+      "3001.dat": ref("stud.dat"),
+      "stud.dat": "0 Stud",
+    });
+
+    expect(mpd.match(/0 \/\/ Repacked for the web\./g)).toHaveLength(1);
+  });
+
+  it("leaves each inlined part's own Author and !LICENSE lines alone", async () => {
+    const { mpd } = await pack(ref("3001.dat"), {
+      "3001.dat": [
+        "0 Brick  2 x  4",
+        "0 Author: James Jessiman",
+        "0 !LICENSE Licensed under CC BY 4.0 : see CAreadme.txt",
+      ].join("\n"),
+    });
+
+    expect(mpd).toContain("0 Author: James Jessiman");
+    expect(mpd).toContain(
+      "0 !LICENSE Licensed under CC BY 4.0 : see CAreadme.txt"
+    );
+  });
+});
+
 describe("packModel with an .mpd input", () => {
   const mpdSource = [
     "0 FILE main.ldr",

@@ -322,6 +322,13 @@ describe("toLdrawFile", () => {
     expect(text).toContain("0 !LDRAW_ORG Unofficial_Model");
   });
 
+  it("claims neither authorship of nor a licence over the person's model", () => {
+    const text = toLdrawFile([place()], "My build");
+
+    expect(text).not.toContain("0 Author:");
+    expect(text).not.toContain("!LICENSE");
+  });
+
   it("writes an unturned part with an identity rotation", () => {
     const text = toLdrawFile([place({ position: new Vector3(0, 24, 0) })], "x");
 

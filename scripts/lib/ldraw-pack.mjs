@@ -370,6 +370,50 @@ function seed(text, rootName) {
 }
 
 /**
+ * The modification notice CC BY asks for, in LDraw comment lines.
+ *
+ * CAreadme.txt lists five things attribution needs: name the creator, link the
+ * work, name the licence, link the licence, and "Note whether the work has been
+ * modified". The first four ride along in every block's own Author and !LICENSE
+ * lines, which packing preserves. The fifth is this, because LDraw's own rule on
+ * derivative works turns on exactly what packing does: a model that references
+ * library parts is not a derivative work, while one that includes their source
+ * "in any form" is.
+ *
+ * No tool name in here on purpose, so it survives this project being renamed.
+ */
+const MODIFICATION_NOTICE = [
+  "0 // Repacked for the web. Every part file this model references is inlined",
+  "0 // below and its name normalised to the key LDrawLoader looks it up by. No",
+  "0 // geometry is altered and no header is dropped: each block below keeps the",
+  "0 // Author and !LICENSE lines it shipped with.",
+  "0 // Parts are from the LDraw Parts Library, https://library.ldraw.org/, under",
+  "0 // CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) and CC BY 4.0",
+  "0 // (https://creativecommons.org/licenses/by/4.0/), per block.",
+];
+
+/**
+ * Put the notice directly under the root block's header, not above or inside it.
+ *
+ * It cannot go above the first `0 FILE`: LDrawLoader only treats that directive
+ * as the main model when it is on line 0, and anything earlier demotes the whole
+ * model to an embedded file that nothing references. It cannot go inside the
+ * header either. That is description, `0 Name:`, `0 Author:`, `0 !LDRAW_ORG`,
+ * `0 !LICENSE` in that order, which a header checker reads positionally, and the
+ * description in particular is what `partNamesFromMpd` takes as the model's name.
+ * So the notice goes after the last of those, which lands it under the licence
+ * line it is there to qualify.
+ */
+function withNotice(body) {
+  const lines = splitLines(body);
+  const header = lines.findIndex((line) => !line.trim().startsWith("0 "));
+  const at = header === -1 ? lines.length : header;
+  return [...lines.slice(0, at), ...MODIFICATION_NOTICE, ...lines.slice(at)]
+    .join("\n")
+    .trimEnd();
+}
+
+/**
  * Concatenate every body into one .mpd, dropping references that went missing.
  *
  * An unresolved reference left in the output makes the loader reach for the
@@ -398,7 +442,7 @@ function assemble({ bodies, missing, rootBody, rootName, skipMissing }) {
     return kept.join("\n").trimEnd();
   };
 
-  const chunks = [`0 FILE ${rootName}`, emit(rootBody), ""];
+  const chunks = [`0 FILE ${rootName}`, withNotice(emit(rootBody)), ""];
   for (const [key, body] of bodies) {
     chunks.push(`0 FILE ${key}`, emit(body), "");
   }

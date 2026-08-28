@@ -55,7 +55,7 @@ export function FreeBuildCard({ className = "" }: { className?: string }) {
           )}
         </dl>
         <p className="readout mt-3 text-faint">
-          Parts library by LDraw.org, CC BY 2.0
+          Parts library by LDraw.org, CC BY 2.0 / 4.0
         </p>
       </div>
     </Link>

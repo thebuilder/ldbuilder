@@ -26,12 +26,12 @@ export const metadata: Metadata = {
   openGraph: {
     description:
       "Tip the bricks onto the floor and watch a model assemble itself, one build step at a time.",
-    title: "LDraw Builder",
+    title: "LDBuilder",
     type: "website",
   },
   title: {
-    default: "LDraw Builder",
-    template: "%s / LDraw Builder",
+    default: "LDBuilder",
+    template: "%s / LDBuilder",
   },
   twitter: { card: "summary_large_image" },
 };

@@ -1,5 +1,5 @@
 {
-  "name": "ldraw-builder",
+  "name": "ldbuilder",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,6 +16,7 @@
     "ldraw:pack": "node scripts/pack-models.mjs",
     "ldraw:palette": "node scripts/pack-palette.mjs",
     "ldraw:setup": "node scripts/setup-ldraw.mjs",
+    "notices": "node scripts/gen-notices.mjs",
     "start": "next start",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

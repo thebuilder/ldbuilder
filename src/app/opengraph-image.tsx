@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "LDraw Builder: watch a LEGO model build itself, then build one yourself";
+  "LDBuilder: watch a LEGO model build itself, then build one yourself";
 export const size = { height: 630, width: 1200 };
 export const contentType = "image/png";
 

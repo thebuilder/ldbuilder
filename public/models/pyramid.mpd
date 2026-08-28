@@ -2,6 +2,13 @@
 0 Example Pyramid for Demonstration of LDRAW Library
 0 Name: pyramid.ldr
 0 Author: James Jessiman
+0 // Repacked for the web. Every part file this model references is inlined
+0 // below and its name normalised to the key LDrawLoader looks it up by. No
+0 // geometry is altered and no header is dropped: each block below keeps the
+0 // Author and !LICENSE lines it shipped with.
+0 // Parts are from the LDraw Parts Library, https://library.ldraw.org/, under
+0 // CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) and CC BY 4.0
+0 // (https://creativecommons.org/licenses/by/4.0/), per block.
 
 0 // This file demonstrates how you can assemble a model from part files.
 0 // Each line starting with "1" adds one part. It states its color, position and orientation.

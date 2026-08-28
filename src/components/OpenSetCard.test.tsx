@@ -105,14 +105,27 @@ describe("OpenSetCard", () => {
     );
   });
 
-  it("credits the author in the title, as CC BY requires", async () => {
+  it("carries the author through as credit, as CC BY requires", async () => {
     await submit("928");
 
     await waitFor(() =>
       expect(putUpload).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: "928-1 by Willy Tschager [Holly-Wood]",
+          credit: "Willy Tschager [Holly-Wood], LDraw OMR (CC BY 2.0)",
+          title: "928-1",
         })
+      )
+    );
+  });
+
+  it("still credits the repository when a set names no author", async () => {
+    stubApi(() => json({ ...PACKED, author: null }));
+
+    await submit("928");
+
+    await waitFor(() =>
+      expect(putUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ credit: "LDraw OMR (CC BY 2.0)" })
       )
     );
   });
