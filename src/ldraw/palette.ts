@@ -305,6 +305,7 @@ export function instantiate(
     partName: part.name,
     radius: part.radius,
     step: 0,
+    subassembly: -1,
     submodelPath: [],
   };
 }

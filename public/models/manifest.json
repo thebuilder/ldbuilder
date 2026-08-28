@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-26T19:11:04.898Z",
+  "generatedAt": "2026-08-27T15:58:57.117Z",
   "models": [
     {
       "author": null,
@@ -12,19 +12,6 @@
       "theme": null,
       "title": "Example Pyramid",
       "uniqueParts": 2,
-      "userSupplied": false
-    },
-    {
-      "author": null,
-      "blurb": "Has no build steps of its own, so the order is inferred bottom-up.",
-      "bricks": 38,
-      "bytes": 18071,
-      "credit": "Generated, from LDraw library parts (CC BY 2.0)",
-      "slug": "wall",
-      "steps": 1,
-      "theme": null,
-      "title": "Running Bond Wall",
-      "uniqueParts": 3,
       "userSupplied": false
     },
     {
@@ -44,7 +31,7 @@
       "author": null,
       "blurb": "Four towers and a span, each its own submodel to isolate and inspect.",
       "bricks": 128,
-      "bytes": 20261,
+      "bytes": 20254,
       "credit": "Generated, from LDraw library parts (CC BY 2.0)",
       "slug": "gatehouse",
       "steps": 24,

@@ -647,6 +647,46 @@ describe("SceneController watch mode", () => {
     expect(camera.position.length()).not.toBeCloseTo(table, 3);
   });
 
+  it("frames the staging area while watching, but not while building", () => {
+    // One subassembly displaced far to one side, so the two framings cannot
+    // come out the same distance by accident.
+    const model = makeModel({
+      bricks: [
+        { at: [-40, 24, 0], step: 0 },
+        { at: [40, 24, 0], step: 0 },
+        { at: [-40, 48, 0], step: 1, subassembly: 0 },
+        { at: [40, 48, 0], step: 1, subassembly: 0 },
+        { at: [0, 72, 0], step: 2, subassembly: 0 },
+      ],
+      slug: "test-staged",
+      subassemblies: [
+        {
+          brickIds: [2, 3, 4],
+          installStep: 2,
+          label: "wing",
+          offset: new Vector3(4000, 0, 0),
+        },
+      ],
+    });
+    controller.setModel(model);
+    const { camera } = (
+      controller as unknown as {
+        viewport: { camera: { position: { length: () => number } } };
+      }
+    ).viewport;
+
+    controller.setInput(input({ mode: "assemble" }));
+    const watching = camera.position.length();
+
+    controller.setInput(input({ mode: "assemble", session: "build" }));
+    controller.frameModel();
+    const building = camera.position.length();
+
+    // Watching has to fit the staging area on screen as well as the model, so
+    // it pulls back further than building, which never uses that ground.
+    expect(watching).toBeGreaterThan(building);
+  });
+
   it("lands on a scrubbed step rather than replaying the drop into it", async () => {
     const model = buildableModel();
     controller.setModel(model);

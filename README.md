@@ -68,7 +68,7 @@ pnpm ldraw:setup     # download + extract the parts library (138 MB, gitignored)
 pnpm ldraw:colors    # LDConfig.ldr -> src/ldraw/colors.generated.ts
 pnpm ldraw:pack      # pack the curated models into public/models
 pnpm ldraw:palette   # pack the free-build parts into public/parts
-pnpm ldraw:demos     # regenerate the two generated demo models
+pnpm ldraw:demos     # regenerate the generated demo model, checking it is buildable
 pnpm ldraw:index     # rescrape the searchable OMR set list
 
 pnpm ldraw:pack path/to/some-set.ldr    # add one more to the gallery
@@ -84,15 +84,15 @@ a mismatch between the two is caught rather than silently losing parts.
 | Model | Bricks | Steps | What it covers |
 | --- | --- | --- | --- |
 | Example Pyramid | 13 | 4 | The smallest thing with a real build order |
-| Running Bond Wall | 38 | 1 | No `0 STEP` metas, so the order is inferred |
 | Example Car | 61 | 8 | Authored steps, 26 different parts |
-| Gatehouse | 128 | 24 | Submodels: four towers and a span |
+| Gatehouse | 128 | 24 | Submodels staged off-model: four towers and a span |
 | 928 Galaxy Explorer | 368 | 53 | A real set, 53 steps as its author wrote them |
 | 21309 NASA Apollo Saturn V | 1,845 | 775 | 30 bags, deep submodels, the scale case |
 
-The two examples ship inside the LDraw library. The wall and gatehouse are
-generated from library parts by `scripts/make-demos.mjs`, to cover cases the
-library samples do not. The two official sets come from the OMR.
+The two examples ship inside the LDraw library. The gatehouse is generated from
+library parts by `scripts/make-demos.mjs`, to cover the case the library samples
+do not, which is a model made of submodels. The two official sets come from the
+OMR.
 
 ### Official sets, and why they can ship here
 
@@ -203,6 +203,20 @@ twice.
 none, it infers an order from how the model stacks up, keeping each submodel
 together, and labels those steps `inferred` so nobody thinks the set ships that
 way.
+
+**Subassemblies are built off the model.** An LDraw file records every brick at
+its position in the *finished* model, submodels included. Replayed literally, a
+subassembly assembles itself in mid-air, inside the silhouette of a model that
+does not exist around it yet, which is the one thing in the whole build that
+cannot be what happened. Instruction booklets take you off to a corner of the
+page for exactly this reason, and the watch flow does the same: a submodel
+occurrence between five and forty bricks, built over more than one step and not
+standing on the ground, is displaced clear of the model while it is built, then
+slides in on the step its last brick goes on. The displacement is a pure
+translation, chosen as the cheapest of the five ways out of the model's
+silhouette, so it is recognisably the thing that is about to slot in and it does
+not cross the whole model to get home. Building by hand is left alone: there,
+every brick goes straight where it belongs.
 
 **Bags.** Four thousand bricks on the floor at once is unreadable and slow. Real
 sets already solved this with numbered bags, so the build splits the same way,
@@ -465,7 +479,7 @@ public/models/     committed self-contained .mpd files + manifest
 public/ldraw/      LDConfig.ldr, the colour table
 demo-models/       source for the generated demos
 public/parts/      the free-build palette: one .mpd plus its catalogue
-src/ldraw/         loading, flattening, steps, bags, floor layout, palette
+src/ldraw/         loading, flattening, steps, subassemblies, bags, layout
 src/scene/         renderer, assembly state machine, live physics, build rules
 src/components/    viewer stage and HUD panels
 ```

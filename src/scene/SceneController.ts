@@ -164,6 +164,15 @@ export class SceneController {
   /** Framing targets in world space, computed from data rather than traversal. */
   private modelFrame: Box3 | null = null;
   private bagFrames: Box3[] = [];
+  /**
+   * The same framings, widened to take in where subassemblies are built.
+   *
+   * Kept apart from `bagFrames` because only the watch flow stages anything.
+   * Building by hand puts every brick straight into the model, so framing the
+   * empty ground a subassembly would have been built on there would just push
+   * the model away from the viewer.
+   */
+  private stagedFrames: Box3[] = [];
   private framing: "table" | "model" = "table";
   /** Bag the camera was last framed for, so a new bag re-frames exactly once. */
   private framedBag = -1;
@@ -365,8 +374,10 @@ export class SceneController {
     // would put a 4000-brick set on screen at the size of a postage stamp while
     // you are working on the first hundred bricks of it.
     const point = new Vector3();
+    const staged = new Vector3();
     const bagCount = Math.max(model.bags.length, 1);
     const boxes = Array.from({ length: bagCount }, () => new Box3());
+    const stagedBoxes = Array.from({ length: bagCount }, () => new Box3());
 
     for (const brick of model.bricks) {
       const radius = Math.max(brick.radius, 1);
@@ -383,8 +394,28 @@ export class SceneController {
       own.expandByPoint(
         point.copy(brick.floorPose.position).addScalar(-radius)
       );
+
+      // A brick in a subassembly spends its own bag's steps out beyond the
+      // model, which has to be on screen or the subassembly is built where it
+      // cannot be watched.
+      const subassembly = model.subassemblies[brick.subassembly];
+      if (subassembly) {
+        staged.copy(brick.builtPose.position).add(subassembly.offset);
+        stagedBoxes[brick.bag].expandByPoint(
+          point.copy(staged).addScalar(radius)
+        );
+        stagedBoxes[brick.bag].expandByPoint(
+          point.copy(staged).addScalar(-radius)
+        );
+      }
     }
 
+    // Widened copies first: `toWorld` transforms in place, so taking these off
+    // clones is what keeps the plain framings from being transformed twice.
+    // A bag with nothing staged unions an empty box, which changes nothing.
+    this.stagedFrames = boxes.map((box, index) =>
+      toWorld(box.clone().union(stagedBoxes[index]))
+    );
     this.bagFrames = boxes.map(toWorld);
     this.framedBag = -1;
   }
@@ -461,9 +492,10 @@ export class SceneController {
     const bag =
       steps[Math.min(this.step, Math.max(steps.length - 1, 0))]?.bag ?? 0;
     this.framedBag = bag;
+    const frames = this.build ? this.bagFrames : this.stagedFrames;
     const box =
       this.framing === "table"
-        ? (this.bagFrames[bag] ?? this.modelFrame)
+        ? (frames[bag] ?? this.modelFrame)
         : this.modelFrame;
     if (box) {
       this.viewport.frameBox(box);

@@ -20,14 +20,13 @@ const read = (slug) =>
   readFile(path.join(PUBLIC_MODELS_DIR, `${slug}.mpd`), "utf8");
 
 describe("the committed models", () => {
-  it("ships the six the gallery expects", () => {
+  it("ships the five the gallery expects", () => {
     expect(models.map((m) => m.slug).sort()).toEqual([
       "car",
       "galaxy-explorer",
       "gatehouse",
       "pyramid",
       "saturn-v",
-      "wall",
     ]);
   });
 

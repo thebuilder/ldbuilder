@@ -48,6 +48,19 @@ export function staggered(
   return clamp01((t - start) / window);
 }
 
+/**
+ * Rescale the slice of a 0-1 timeline between `from` and `to` back onto 0-1,
+ * so two things can take turns inside one progress value.
+ */
+export function phase(t: number, from: number, to: number): number {
+  return clamp01((t - from) / (to - from));
+}
+
+/** Ease in and out, for a move that starts and ends at rest. */
+export function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
 /** Smooth follow that is frame-rate independent, unlike a raw lerp per frame. */
 export function damp(
   current: number,

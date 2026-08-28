@@ -1,3 +1,4 @@
+import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { makeModel } from "@/test/fixtures";
 import type { AssemblyState } from "./Assembly";
@@ -256,6 +257,139 @@ describe("Assembly in watch mode", () => {
     const assembly = new Assembly(model);
 
     expect(() => assembly.update(watch())).not.toThrow();
+    assembly.dispose();
+  });
+});
+
+describe("Assembly staging a subassembly", () => {
+  /**
+   * Three bricks in a subassembly built over steps 0-1 and fitted at step 1,
+   * then one brick of the parent model at step 2. The offset is along x so the
+   * assertions can read it off one axis.
+   */
+  const staged = () =>
+    makeModel({
+      bricks: [
+        { at: [0, 24, 0], step: 0, subassembly: 0 },
+        { at: [0, 48, 0], step: 1, subassembly: 0 },
+        { at: [0, 72, 0], step: 1, subassembly: 0 },
+        { at: [200, 24, 0], step: 2 },
+      ],
+      subassemblies: [
+        {
+          brickIds: [0, 1, 2],
+          installStep: 1,
+          label: "tower",
+          offset: new Vector3(500, 0, 0),
+        },
+      ],
+    });
+
+  it("builds it off to the side rather than where it belongs", () => {
+    const model = staged();
+    const assembly = new Assembly(model);
+
+    // Step 0 is done, so brick 0 is placed; the subassembly does not go on
+    // until step 1, so that placement is out at the staging offset.
+    assembly.update(watch({ step: 1 }));
+
+    expect(model.bricks[0].object.position.x).toBeCloseTo(500, 5);
+    expect(model.bricks[0].object.position.y).toBeCloseTo(24, 5);
+    assembly.dispose();
+  });
+
+  it("finishes it before it starts moving it", () => {
+    const model = staged();
+    const assembly = new Assembly(model);
+
+    // Half way through the install step: the last bricks have gone on, and the
+    // move has not started.
+    assembly.update(watch({ step: 1, stepProgress: 0.5 }));
+
+    expect(model.bricks[0].object.position.x).toBeCloseTo(500, 5);
+    expect(model.bricks[2].object.position.x).toBeCloseTo(500, 5);
+    assembly.dispose();
+  });
+
+  it("moves the whole subassembly together, not brick by brick", () => {
+    const model = staged();
+    const assembly = new Assembly(model);
+
+    assembly.update(watch({ step: 1, stepProgress: 0.75 }));
+
+    const [a, b, c] = model.bricks;
+    // Part way in, and all three the same distance along: they travel as one.
+    expect(a.object.position.x).toBeGreaterThan(0);
+    expect(a.object.position.x).toBeLessThan(500);
+    expect(b.object.position.x).toBeCloseTo(a.object.position.x, 5);
+    expect(c.object.position.x).toBeCloseTo(a.object.position.x, 5);
+    assembly.dispose();
+  });
+
+  it("has it on the model once the install step is behind it", () => {
+    const model = staged();
+    const assembly = new Assembly(model);
+
+    assembly.update(watch({ step: 2 }));
+
+    for (const id of [0, 1, 2]) {
+      expect(model.bricks[id].object.position.x).toBeCloseTo(0, 5);
+    }
+    assembly.dispose();
+  });
+
+  it("keeps an early brick waiting for the rest of its subassembly", () => {
+    // Four bricks over steps 0-2, so at the end of step 0 there is a brick that
+    // is placed, in a subassembly that is nowhere near going on yet.
+    const model = makeModel({
+      bricks: [
+        { at: [0, 24, 0], step: 0, subassembly: 0 },
+        { at: [0, 48, 0], step: 1, subassembly: 0 },
+        { at: [0, 72, 0], step: 2, subassembly: 0 },
+        { at: [0, 96, 0], step: 2, subassembly: 0 },
+        { at: [200, 24, 0], step: 3 },
+      ],
+      subassemblies: [
+        {
+          brickIds: [0, 1, 2, 3],
+          installStep: 2,
+          label: "tower",
+          offset: new Vector3(500, 0, 0),
+        },
+      ],
+    });
+    const assembly = new Assembly(model);
+
+    assembly.update(watch({ step: 1 }));
+
+    // Its own step is behind it, but the subassembly's is not, so it waits out
+    // at the staging offset rather than going on alone.
+    expect(model.bricks[0].object.position.x).toBeCloseTo(500, 5);
+    assembly.dispose();
+  });
+
+  it("leaves a brick outside any subassembly on the ordinary path", () => {
+    const model = staged();
+    const assembly = new Assembly(model);
+
+    assembly.update(watch({ step: 3 }));
+
+    expect(model.bricks[3].object.position.toArray()).toEqual([200, 24, 0]);
+    assembly.dispose();
+  });
+
+  it("flies a staged brick to the staging area, not through the model", () => {
+    const model = staged();
+    const assembly = new Assembly(model);
+
+    // Mid-flight on its own step, so it is between the floor and where that
+    // step leaves it, which is out at the offset.
+    assembly.update(watch({ step: 0, stepProgress: 0.99 }));
+
+    const { x } = model.bricks[0].object.position;
+    const floorX = model.bricks[0].floorPose.position.x;
+    expect(x).toBeGreaterThan(Math.min(floorX, 500) - 1);
+    expect(x).toBeCloseTo(500, 0);
     assembly.dispose();
   });
 });
