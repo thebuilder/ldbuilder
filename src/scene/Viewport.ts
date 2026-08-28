@@ -12,12 +12,14 @@ import {
   Scene,
   ShadowMaterial,
   Sphere,
+  Spherical,
   Vector3,
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { isTypingTarget } from "@/lib/dom";
+import { isTypingTarget, prefersReducedMotion } from "@/lib/dom";
+import { clamp01, easeInOutCubic } from "./animation";
 
 /**
  * The room the bricks are in: renderer, lighting, floor, camera, and the keys
@@ -47,6 +49,21 @@ const MOVE_DAMPING = 14;
 /** Keep the camera above the floor rather than letting it sink through. */
 const MIN_CAMERA_HEIGHT = 2;
 
+/**
+ * How long a re-framing takes, in seconds.
+ *
+ * A move is worth watching only for as long as it takes to read where you have
+ * been taken. The short end is for a shift to the next subassembly a stud or
+ * two away; the long end is for being carried across the whole model, and even
+ * that stays under a step of playback so the build is never waiting on the
+ * camera.
+ */
+const FLIGHT_MIN_SECONDS = 0.45;
+const FLIGHT_MAX_SECONDS = 1;
+
+const FLIGHT_OFFSET = new Spherical();
+const FLIGHT_DIRECTION = new Vector3(0.72, 0.5, 1).normalize();
+
 const UP = new Vector3(0, 1, 0);
 
 /** Keys that drive the camera. Everything else is somebody else's to handle. */
@@ -62,6 +79,33 @@ const NAV_KEYS = new Set([
   "ArrowLeft",
   "ArrowRight",
 ]);
+
+/** Somewhere for the camera to be, and the limits that go with being there. */
+interface CameraView {
+  far: number;
+  maxDistance: number;
+  minDistance: number;
+  near: number;
+  position: Vector3;
+  target: Vector3;
+}
+
+/**
+ * A re-framing part way through playing out.
+ *
+ * The camera is carried as a spherical offset from the point it is looking at
+ * rather than as a position, so a move swings around the model the way a person
+ * walking to the other side of a table would, instead of taking the straight
+ * line through the middle of it.
+ */
+interface CameraFlight {
+  duration: number;
+  elapsed: number;
+  from: CameraView;
+  fromOffset: Spherical;
+  to: CameraView;
+  toOffset: Spherical;
+}
 
 export interface ViewportOptions {
   /** Called when the viewer takes the camera somewhere themselves. */
@@ -93,6 +137,7 @@ export class Viewport {
   private readonly moveDelta = new Vector3();
 
   private options: ViewportOptions = {};
+  private flight: CameraFlight | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -232,8 +277,15 @@ export class Viewport {
     return grid;
   }
 
-  /** Put a box on screen, whatever it happens to contain. */
-  frameBox(box: Box3): void {
+  /**
+   * Put a box on screen, whatever it happens to contain.
+   *
+   * The camera travels there rather than cutting, because a cut between two
+   * views of the same model reads as the model having moved. Pass `instant`
+   * when there is nothing to travel from: the first framing of a model is a
+   * camera being placed, not a camera going somewhere.
+   */
+  frameBox(box: Box3, instant = false): void {
     if (box.isEmpty()) {
       return;
     }
@@ -241,17 +293,126 @@ export class Viewport {
     const fov = (this.camera.fov * Math.PI) / 180;
     const distance = (sphere.radius / Math.sin(fov / 2)) * 1.08;
 
-    const direction = new Vector3(0.72, 0.5, 1).normalize();
-    this.camera.position
-      .copy(sphere.center)
-      .addScaledVector(direction, distance);
-    this.controls.target.copy(sphere.center);
-    this.camera.near = Math.max(distance / 800, 0.1);
-    this.camera.far = distance * 10;
-    this.controls.minDistance = sphere.radius * 0.25;
-    this.controls.maxDistance = distance * 4;
+    const view: CameraView = {
+      far: distance * 10,
+      maxDistance: distance * 4,
+      minDistance: sphere.radius * 0.25,
+      near: Math.max(distance / 800, 0.1),
+      position: sphere.center
+        .clone()
+        .addScaledVector(FLIGHT_DIRECTION, distance),
+      target: sphere.center.clone(),
+    };
+
+    if (instant || prefersReducedMotion()) {
+      this.flight = null;
+      this.applyView(view);
+      return;
+    }
+    this.startFlight(view);
+  }
+
+  private applyView(view: CameraView): void {
+    this.camera.position.copy(view.position);
+    this.controls.target.copy(view.target);
+    this.camera.near = view.near;
+    this.camera.far = view.far;
+    this.controls.minDistance = view.minDistance;
+    this.controls.maxDistance = view.maxDistance;
     this.camera.updateProjectionMatrix();
     this.controls.update();
+  }
+
+  private startFlight(view: CameraView): void {
+    const from: CameraView = {
+      far: this.camera.far,
+      maxDistance: this.controls.maxDistance,
+      minDistance: this.controls.minDistance,
+      near: this.camera.near,
+      position: this.camera.position.clone(),
+      target: this.controls.target.clone(),
+    };
+    const fromOffset = new Spherical().setFromVector3(
+      from.position.clone().sub(from.target)
+    );
+    const toOffset = new Spherical().setFromVector3(
+      view.position.clone().sub(view.target)
+    );
+
+    // Angles wrap, so arrive by the short way round rather than unwinding most
+    // of a turn to reach the same place.
+    let swing = (toOffset.theta - fromOffset.theta) % (Math.PI * 2);
+    if (Math.abs(swing) > Math.PI) {
+      swing -= Math.sign(swing) * Math.PI * 2;
+    }
+    toOffset.theta = fromOffset.theta + swing;
+
+    // Scale the move to how far it actually goes, measured against how far away
+    // the camera is: shifting to the next subassembly should not take as long
+    // as being carried the length of the model.
+    const reach = Math.max(fromOffset.radius, toOffset.radius, 1e-3);
+    const arc =
+      (Math.abs(swing) + Math.abs(toOffset.phi - fromOffset.phi)) * reach;
+    const travel =
+      from.target.distanceTo(view.target) +
+      Math.abs(toOffset.radius - fromOffset.radius) +
+      arc;
+
+    this.flight = {
+      duration:
+        FLIGHT_MIN_SECONDS +
+        (FLIGHT_MAX_SECONDS - FLIGHT_MIN_SECONDS) * clamp01(travel / reach),
+      elapsed: 0,
+      from,
+      fromOffset,
+      to: view,
+      toOffset,
+    };
+  }
+
+  /**
+   * Advance a re-framing by one frame.
+   *
+   * The limits travel with the camera. Handing over the destination's minimum
+   * distance up front would have OrbitControls shove the camera back out of a
+   * close framing it has not arrived at yet; interpolating them keeps the
+   * camera inside its own limits the whole way.
+   */
+  private advanceFlight(flight: CameraFlight, dt: number): void {
+    flight.elapsed += dt;
+    const t = clamp01(flight.elapsed / flight.duration);
+    const eased = easeInOutCubic(t);
+    const mix = (from: number, to: number) => from + (to - from) * eased;
+
+    this.controls.target.lerpVectors(
+      flight.from.target,
+      flight.to.target,
+      eased
+    );
+    FLIGHT_OFFSET.set(
+      mix(flight.fromOffset.radius, flight.toOffset.radius),
+      mix(flight.fromOffset.phi, flight.toOffset.phi),
+      mix(flight.fromOffset.theta, flight.toOffset.theta)
+    );
+    this.camera.position
+      .setFromSpherical(FLIGHT_OFFSET)
+      .add(this.controls.target);
+
+    this.camera.near = mix(flight.from.near, flight.to.near);
+    this.camera.far = mix(flight.from.far, flight.to.far);
+    this.camera.updateProjectionMatrix();
+    this.controls.minDistance = mix(
+      flight.from.minDistance,
+      flight.to.minDistance
+    );
+    this.controls.maxDistance = mix(
+      flight.from.maxDistance,
+      flight.to.maxDistance
+    );
+
+    if (t >= 1) {
+      this.flight = null;
+    }
   }
 
   resize(width: number, height: number): void {
@@ -269,6 +430,7 @@ export class Viewport {
   }
 
   private readonly handleControlsStart = (): void => {
+    this.flight = null;
     this.options.onUserMove?.();
   };
 
@@ -300,6 +462,7 @@ export class Viewport {
     }
 
     this.keysDown.add(event.code);
+    this.flight = null;
     this.options.onUserMove?.();
     event.preventDefault();
   };
@@ -318,6 +481,20 @@ export class Viewport {
   };
 
   /**
+   * Move the camera for this frame.
+   *
+   * A re-framing in flight owns the camera outright: the keys cancel it the
+   * moment they are pressed, so the two can never be pulling at once.
+   */
+  updateCamera(dt: number): void {
+    if (this.flight) {
+      this.advanceFlight(this.flight, dt);
+      return;
+    }
+    this.updateNavigation(dt);
+  }
+
+  /**
    * Walk the camera across the world.
    *
    * Both the camera and its orbit target move together, so this pans rather
@@ -326,7 +503,7 @@ export class Viewport {
    * looking down at the floor and pressing W travels along it instead of
    * burrowing into it.
    */
-  updateNavigation(dt: number): void {
+  private updateNavigation(dt: number): void {
     const held = (...codes: string[]) =>
       codes.some((code) => this.keysDown.has(code));
 

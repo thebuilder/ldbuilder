@@ -51,7 +51,7 @@ function travel(code: string, init: KeyboardEventInit = {}) {
   const from = viewport.camera.position.clone();
   press(code, init);
   for (let i = 0; i < 6; i += 1) {
-    viewport.updateNavigation(1 / 60);
+    viewport.updateCamera(1 / 60);
   }
   release(code);
   return viewport.camera.position.distanceTo(from);
@@ -66,6 +66,56 @@ describe("Viewport", () => {
     const { camera, controls } = viewport;
     expect(controls.target.x).toBeCloseTo(0, 5);
     expect(camera.position.distanceTo(controls.target)).toBeGreaterThan(50);
+  });
+
+  it("flies to a new framing rather than cutting to it", () => {
+    const here = new Box3(new Vector3(-50, 0, -50), new Vector3(50, 40, 50));
+    viewport.frameBox(here, true);
+    const start = viewport.camera.position.clone();
+
+    const away = new Box3(new Vector3(450, 0, 450), new Vector3(550, 40, 550));
+    viewport.frameBox(away);
+
+    // Nothing has moved yet: the move belongs to the frames that follow.
+    expect(viewport.camera.position).toEqual(start);
+
+    viewport.updateCamera(1 / 60);
+    expect(viewport.camera.position.distanceTo(start)).toBeGreaterThan(0);
+    expect(viewport.controls.target.x).toBeLessThan(400);
+
+    viewport.updateCamera(10);
+    expect(viewport.controls.target.x).toBeCloseTo(500, 5);
+  });
+
+  it("gives the camera back the moment the viewer reaches for it", () => {
+    viewport.frameBox(
+      new Box3(new Vector3(-50, 0, -50), new Vector3(50, 40, 50)),
+      true
+    );
+    viewport.frameBox(
+      new Box3(new Vector3(450, 0, 450), new Vector3(550, 40, 550))
+    );
+    viewport.updateCamera(1 / 60);
+
+    press("KeyW");
+    viewport.updateCamera(1 / 60);
+    release("KeyW");
+    const taken = viewport.camera.position.clone();
+
+    // The rest of the flight has been called off, rather than resuming and
+    // hauling the camera away from where the viewer just steered it.
+    viewport.updateCamera(10);
+    expect(viewport.camera.position.distanceTo(taken)).toBeLessThan(1);
+  });
+
+  it("puts the camera straight there when movement is not wanted", () => {
+    stubBrowser(true);
+
+    viewport.frameBox(
+      new Box3(new Vector3(450, 0, 450), new Vector3(550, 40, 550))
+    );
+
+    expect(viewport.controls.target.x).toBeCloseTo(500, 5);
   });
 
   it("ignores a box with nothing in it", () => {
@@ -99,7 +149,7 @@ describe("Viewport", () => {
     viewport.controls.target.set(0, 0, 0);
     press("KeyQ");
     for (let i = 0; i < 30; i += 1) {
-      viewport.updateNavigation(1 / 60);
+      viewport.updateCamera(1 / 60);
     }
     release("KeyQ");
 
@@ -114,7 +164,7 @@ describe("Viewport", () => {
     input.dispatchEvent(
       new KeyboardEvent("keydown", { bubbles: true, code: "ArrowUp" })
     );
-    viewport.updateNavigation(1 / 60);
+    viewport.updateCamera(1 / 60);
 
     expect(viewport.camera.position).toEqual(before);
     input.remove();
@@ -125,7 +175,7 @@ describe("Viewport", () => {
     const before = viewport.camera.position.clone();
 
     press("ArrowUp");
-    viewport.updateNavigation(1 / 60);
+    viewport.updateCamera(1 / 60);
     release("ArrowUp");
 
     expect(viewport.camera.position).toEqual(before);
@@ -137,7 +187,7 @@ describe("Viewport", () => {
     const before = viewport.camera.position.clone();
 
     press("KeyW", { metaKey: true });
-    viewport.updateNavigation(1 / 60);
+    viewport.updateCamera(1 / 60);
 
     expect(viewport.camera.position).toEqual(before);
   });
@@ -148,7 +198,7 @@ describe("Viewport", () => {
     const before = viewport.camera.position.clone();
 
     for (let i = 0; i < 10; i += 1) {
-      viewport.updateNavigation(1 / 60);
+      viewport.updateCamera(1 / 60);
     }
 
     expect(viewport.camera.position.distanceTo(before)).toBeLessThan(0.001);

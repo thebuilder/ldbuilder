@@ -243,7 +243,8 @@ export class FreeController {
     if (resume) {
       this.restore();
     }
-    this.frame();
+    // Nothing to fly from on the first framing: the camera is being placed.
+    this.frame(true);
     this.report(true);
   }
 
@@ -483,7 +484,7 @@ export class FreeController {
     return toLdrawFile([...this.placements.values()], title);
   }
 
-  frame(): void {
+  frame(instant = false): void {
     const box = new Box3();
     const standing = new Box3();
     for (const entry of this.placed.values()) {
@@ -502,7 +503,7 @@ export class FreeController {
       // rather than the build filling the frame edge to edge.
       box.expandByScalar(STUD * 4);
     }
-    this.viewport.frameBox(box);
+    this.viewport.frameBox(box, instant);
   }
 
   // --------------------------------------------------------------- running
@@ -526,7 +527,7 @@ export class FreeController {
       world.step(dt);
       world.sync(this.instances as Brick[]);
     }
-    this.viewport.updateNavigation(dt);
+    this.viewport.updateCamera(dt);
     this.viewport.render();
 
     if (

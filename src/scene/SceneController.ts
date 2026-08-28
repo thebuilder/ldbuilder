@@ -24,6 +24,7 @@ import {
   readBuild,
   writeBuild,
 } from "@/lib/buildStore";
+import { prefersReducedMotion } from "@/lib/dom";
 import { Assembly, type AssemblyState, type BuildFrame } from "./Assembly";
 import { clamp01, damp, easeOutBackSoft } from "./animation";
 import { BuildSession } from "./buildSession";
@@ -343,7 +344,7 @@ export class SceneController {
     this.pourProgress = 0;
     this.activeBag = -1;
     this.framing = "table";
-    this.frameModel();
+    this.applyFraming(true);
 
     if (this.input.session === "build") {
       this.enterBuild(true);
@@ -486,6 +487,17 @@ export class SceneController {
     if (toggle) {
       this.framing = this.framing === "table" ? "model" : "table";
     }
+    this.applyFraming(false);
+  }
+
+  /**
+   * Point the camera at whichever framing is in force.
+   *
+   * `instant` places the camera rather than flying it there, for the one case
+   * where flying makes no sense: a model that has only just been loaded, where
+   * the camera is still looking at wherever the last one was.
+   */
+  private applyFraming(instant: boolean): void {
     this.userMoved = false;
 
     const steps = this.model?.steps ?? [];
@@ -498,7 +510,7 @@ export class SceneController {
         ? (frames[bag] ?? this.modelFrame)
         : this.modelFrame;
     if (box) {
-      this.viewport.frameBox(box);
+      this.viewport.frameBox(box, instant);
     }
   }
 
@@ -513,7 +525,7 @@ export class SceneController {
   private tick(dt: number): void {
     if (this.build) {
       this.tickBuild(dt);
-      this.viewport.updateNavigation(dt);
+      this.viewport.updateCamera(dt);
       this.viewport.render();
       return;
     }
@@ -543,7 +555,7 @@ export class SceneController {
       assembly.update(state);
     }
 
-    this.viewport.updateNavigation(dt);
+    this.viewport.updateCamera(dt);
     this.viewport.render();
   }
 
@@ -1444,11 +1456,3 @@ function floorClearance(brick: Brick): number {
 
 const SCRATCH = new Vector3();
 const SCRATCH_MATRIX = new Matrix4();
-
-/** Falling bricks are decorative; skip straight to the resting pose if asked. */
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-}
