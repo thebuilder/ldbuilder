@@ -401,10 +401,13 @@ function each(
   }
 }
 
-function overlap(
-  offset: number,
-  count: number
-): { from: number; to: number } | null {
+/** A run of columns, inclusive at both ends. */
+interface Span {
+  from: number;
+  to: number;
+}
+
+function overlap(offset: number, count: number): Span | null {
   // A column ends where the next begins, so a shared edge is not an overlap.
   const from = Math.max(Math.floor(offset / COLUMN), 0);
   const to = Math.min(Math.ceil((offset + COLUMN) / COLUMN) - 1, count - 1);
@@ -488,6 +491,7 @@ export function mergeProfiles(members: Member[]): Profile {
   return merged;
 }
 
+/** Sink one member's columns into the merged grid. */
 function fold(merged: Profile, { offset, profile }: Member): void {
   for (let row = 0; row < profile.rows; row += 1) {
     const rows = overlap(
@@ -499,29 +503,36 @@ function fold(merged: Profile, { offset, profile }: Member): void {
     }
     for (let col = 0; col < profile.cols; col += 1) {
       const at = row * profile.cols + col;
-      if (!Number.isFinite(profile.bottom[at])) {
-        continue;
+      const cols = Number.isFinite(profile.bottom[at])
+        ? overlap(
+            offset.x + profile.anchorX + col * COLUMN - merged.anchorX,
+            merged.cols
+          )
+        : null;
+      if (cols) {
+        paint(merged, rows, cols, offset.y, profile, at);
       }
-      const cols = overlap(
-        offset.x + profile.anchorX + col * COLUMN - merged.anchorX,
-        merged.cols
+    }
+  }
+}
+
+/** One member column, into every merged column it reaches. */
+function paint(
+  merged: Profile,
+  rows: Span,
+  cols: Span,
+  lift: number,
+  profile: Profile,
+  at: number
+): void {
+  for (let row = rows.from; row <= rows.to; row += 1) {
+    for (let col = cols.from; col <= cols.to; col += 1) {
+      const cell = row * merged.cols + col;
+      merged.bottom[cell] = Math.min(
+        merged.bottom[cell],
+        lift + profile.bottom[at]
       );
-      if (!cols) {
-        continue;
-      }
-      for (let into = rows.from; into <= rows.to; into += 1) {
-        for (let across = cols.from; across <= cols.to; across += 1) {
-          const cell = into * merged.cols + across;
-          merged.bottom[cell] = Math.min(
-            merged.bottom[cell],
-            offset.y + profile.bottom[at]
-          );
-          merged.top[cell] = Math.max(
-            merged.top[cell],
-            offset.y + profile.top[at]
-          );
-        }
-      }
+      merged.top[cell] = Math.max(merged.top[cell], lift + profile.top[at]);
     }
   }
 }
