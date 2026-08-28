@@ -27,6 +27,8 @@ import {
 } from "./freeBuild";
 import {
   boundsOf,
+  type Member,
+  mergeProfiles,
   type Profile,
   profileOf,
   type Standing,
@@ -34,6 +36,7 @@ import {
 import { LiveWorld } from "./liveWorld";
 import { loadPhysics } from "./physics";
 import { RenderLoop } from "./RenderLoop";
+import { connectedTo, linksBetween, loadBearing } from "./subassembly";
 import { Viewport } from "./Viewport";
 
 /**
@@ -80,6 +83,8 @@ export interface Armed {
 export interface CarriedInfo {
   blocked: boolean;
   colorCode: number;
+  /** How many parts are in hand. More than one is a subassembly. */
+  count: number;
   file: string;
   name: string;
   /** Grid steps the person has nudged it by. */
@@ -101,14 +106,27 @@ export interface FreeCallbacks {
   onProgress?: (progress: FreeProgress) => void;
 }
 
+/** One part in hand, and where it sits relative to the one that was grabbed. */
+interface Piece {
+  brick: Brick;
+  offset: Vector3;
+  part: PalettePart;
+  tip: number;
+  yaw: number;
+}
+
 interface Carried {
   blocked: boolean;
-  brick: Brick;
   /** Where it came from, so cancelling can put it back. */
   from: "inventory" | "loose" | "placed";
   nudge: { x: number; y: number; z: number };
-  part: PalettePart;
-  tip: number;
+  /**
+   * Everything in hand. The first is the part that was clicked: the pointer
+   * holds that one, and the rest hang off it at the offsets they were built at.
+   */
+  parts: Piece[];
+  /** The whole group measured as one shape, remeasured when it is turned. */
+  profile: Profile;
   /** False until the hand has a previous position to measure against. */
   tracked: boolean;
   /**
@@ -117,7 +135,21 @@ interface Carried {
    * difference between putting a brick down and lobbing it across the floor.
    */
   velocity: Vector3;
-  yaw: number;
+}
+
+/**
+ * Turn an offset a quarter circle at a time about the upright.
+ *
+ * Done as integers rather than through a quaternion because these are grid
+ * offsets: a build turned four times has to come back to the build it was,
+ * and 19.999999 studs from the anchor is a part that no longer lines up.
+ */
+function turnAboutY(offset: Vector3, steps: 0 | 1 | 2 | 3): void {
+  for (let step = 0; step < steps; step += 1) {
+    const { x } = offset;
+    offset.x = offset.z;
+    offset.z = -x;
+  }
 }
 
 export class FreeController {
@@ -161,6 +193,9 @@ export class FreeController {
   private readonly quaternion = new Quaternion();
   private readonly lastCarried = new Vector3();
   private readonly carryStep = new Vector3();
+  /** Its own pair, because the group is walked while the anchor's pose is held. */
+  private readonly pieceQuaternion = new Quaternion();
+  private readonly piecePosition = new Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -222,8 +257,15 @@ export class FreeController {
     this.armed = armed;
     // Changing the colour while something is in hand recolours it, which is
     // what "try it in red" has to mean when a brick is already on the pointer.
+    // Only ever one part at a time: recolouring a subassembly is a different
+    // thing to ask for, and not the thing an armed colour is asking for.
     const { carried } = this;
-    if (carried && armed && armed.file === carried.brick.partFile) {
+    const [only] = carried?.parts ?? [];
+    if (
+      carried?.parts.length === 1 &&
+      armed &&
+      armed.file === only.brick.partFile
+    ) {
       this.recolourCarried(armed.colorCode);
     }
   }
@@ -238,17 +280,9 @@ export class FreeController {
 
     const brick = this.makeInstance(part, colorCode);
     this.viewport.scene.add(brick.object);
-    this.carried = {
-      blocked: false,
-      brick,
-      from: "inventory",
-      nudge: { x: 0, y: 0, z: 0 },
-      part,
-      tip: 0,
-      tracked: false,
-      velocity: new Vector3(),
-      yaw: 0,
-    };
+    this.hold("inventory", [
+      { brick, offset: new Vector3(), part, tip: 0, yaw: 0 },
+    ]);
     this.report();
   }
 
@@ -295,13 +329,32 @@ export class FreeController {
 
   // -------------------------------------------------------------- carrying
 
+  /**
+   * Turn what is in hand a quarter circle at a time.
+   *
+   * A single part turns both ways. A subassembly only turns about the upright,
+   * because tipping one cannot be written down: a pose here is a yaw and a tip,
+   * sixteen of the twenty-four ways a part can sit square to the grid, and
+   * tipping a group takes its members out of those sixteen. Turning it about Y
+   * keeps every member in them, so that is the turn a group gets.
+   */
   rotate(yawSteps: number, tipSteps: number): void {
     const { carried } = this;
     if (!carried) {
       return;
     }
-    carried.yaw = (carried.yaw + yawSteps + 4) % 4;
-    carried.tip = (carried.tip + tipSteps + 4) % 4;
+    const steps = (((yawSteps % 4) + 4) % 4) as 0 | 1 | 2 | 3;
+    if (carried.parts.length === 1) {
+      const [only] = carried.parts;
+      only.yaw = (only.yaw + yawSteps + 4) % 4;
+      only.tip = (only.tip + tipSteps + 4) % 4;
+    } else {
+      for (const piece of carried.parts) {
+        turnAboutY(piece.offset, steps);
+        piece.yaw = (piece.yaw + steps) % 4;
+      }
+    }
+    carried.profile = this.groupProfile(carried.parts);
     // Work out where that leaves it before saying anything: reporting first
     // describes the pose before the turn, so the HUD is a move behind and
     // "will not fit" arrives once you have already fixed it.
@@ -335,25 +388,31 @@ export class FreeController {
       return;
     }
 
-    const { brick } = carried;
-    const position = this.snapped.clone();
-    brick.object.position.copy(position);
-    brick.object.quaternion.copy(this.quaternion);
+    // Each member is written down at its own pose rather than as a child of the
+    // one that was carried: a subassembly is a way of moving parts, not a thing
+    // the build knows about, so putting it down leaves ordinary placements.
+    for (const piece of carried.parts) {
+      const { brick } = piece;
+      const position = this.snapped.clone().add(piece.offset);
+      brick.object.position.copy(position);
+      brick.object.quaternion.copy(
+        orientation(piece.yaw, piece.tip, this.pieceQuaternion)
+      );
 
-    const placement: Placement = {
-      colorCode: brick.colorCode,
-      file: brick.partFile,
-      id: brick.id,
-      position,
-      tip: carried.tip,
-      yaw: carried.yaw,
-    };
-    this.placements.set(brick.id, placement);
-    this.placed.set(brick.id, {
-      position,
-      profile: this.profileFor(carried.part, carried.yaw, carried.tip),
-    });
-    this.world.addStatic(brick);
+      this.placements.set(brick.id, {
+        colorCode: brick.colorCode,
+        file: brick.partFile,
+        id: brick.id,
+        position,
+        tip: piece.tip,
+        yaw: piece.yaw,
+      });
+      this.placed.set(brick.id, {
+        position,
+        profile: this.profileFor(piece.part, piece.yaw, piece.tip),
+      });
+      this.world.addStatic(brick);
+    }
     this.carried = null;
 
     // Putting one down usually means putting another down, so the same part
@@ -373,10 +432,12 @@ export class FreeController {
     }
     this.carried = null;
 
-    if (carried.from === "inventory") {
-      this.destroy(carried.brick.id);
-    } else {
-      this.dropLoose(carried.brick, carried.velocity);
+    for (const piece of carried.parts) {
+      if (carried.from === "inventory") {
+        this.destroy(piece.brick.id);
+      } else {
+        this.dropLoose(piece.brick, carried.velocity);
+      }
     }
     this.report();
   }
@@ -388,7 +449,9 @@ export class FreeController {
       return;
     }
     this.carried = null;
-    this.destroy(carried.brick.id);
+    for (const piece of carried.parts) {
+      this.destroy(piece.brick.id);
+    }
     this.saveDirty = true;
     this.report();
   }
@@ -491,13 +554,21 @@ export class FreeController {
 
     this.trackHand(carried, dt);
 
-    const { object } = carried.brick;
     // Eased rather than teleported: at grid resolution a jump of a whole stud
     // is a jump, and following it is what tells you the snap happened. Only the
     // drawing is eased; the pose that gets recorded is the exact one.
     const blend = 1 - Math.exp(-CARRY_LAMBDA * dt);
-    object.position.lerp(this.snapped, blend);
-    object.quaternion.slerp(this.quaternion, blend);
+    for (const piece of carried.parts) {
+      const { object } = piece.brick;
+      object.position.lerp(
+        this.piecePosition.copy(this.snapped).add(piece.offset),
+        blend
+      );
+      object.quaternion.slerp(
+        orientation(piece.yaw, piece.tip, this.pieceQuaternion),
+        blend
+      );
+    }
   }
 
   /**
@@ -522,7 +593,7 @@ export class FreeController {
         floorY: FLOOR_Y,
         half: this.halfExtents,
         nudge: carried.nudge,
-        profile: this.profileFor(carried.part, carried.yaw, carried.tip),
+        profile: carried.profile,
       },
       this.snapped
     );
@@ -612,7 +683,7 @@ export class FreeController {
     }
     event.stopPropagation();
     event.preventDefault();
-    this.pickUp(hit);
+    this.pickUp(hit, event.shiftKey);
   };
 
   private pick(): number | null {
@@ -632,8 +703,16 @@ export class FreeController {
     return null;
   }
 
-  /** Take a brick back off the build, or out of the pile, and carry it. */
-  private pickUp(id: number): void {
+  /**
+   * Take a brick back off the build, or out of the pile, and carry it.
+   *
+   * A brick out of the pile is a brick. A brick out of the build brings company:
+   * whatever it alone was holding up, because taking it out is what would bring
+   * that down anyway, and with `whole` the entire piece of the build it belongs
+   * to, because sometimes the thing you want to move is the turret and not the
+   * brick you happened to click on.
+   */
+  private pickUp(id: number, whole: boolean): void {
     const brick = this.instances[id];
     const part = brick
       ? this.palette?.byFile.get(brick.partFile.toLowerCase())
@@ -642,30 +721,93 @@ export class FreeController {
       return;
     }
 
-    const placement = this.placements.get(id);
-    if (placement) {
-      this.placements.delete(id);
-      this.placed.delete(id);
-      this.world.removeStatic(id);
-    } else {
+    const anchor = this.placements.get(id);
+    if (!anchor) {
       this.world.despawn(id);
       this.loose.delete(id);
+      this.hold("loose", [
+        { brick, offset: new Vector3(), part, tip: 0, yaw: 0 },
+      ]);
+      this.snapped.copy(brick.object.position);
+      this.saveDirty = true;
+      this.report();
+      return;
     }
 
-    this.carried = {
-      blocked: false,
-      brick,
-      from: placement ? "placed" : "loose",
-      nudge: { x: 0, y: 0, z: 0 },
-      part,
-      tip: placement?.tip ?? 0,
-      tracked: false,
-      velocity: new Vector3(),
-      yaw: placement?.yaw ?? 0,
-    };
-    this.snapped.copy(brick.object.position);
+    const parts: Piece[] = [];
+    for (const memberId of this.groupAround(id, whole)) {
+      const piece = this.lift(memberId, anchor.position);
+      if (piece) {
+        parts.push(piece);
+      }
+    }
+    this.hold("placed", parts);
+    this.snapped.copy(anchor.position);
     this.saveDirty = true;
     this.report();
+  }
+
+  /**
+   * The placed parts a click on this one should bring with it, clicked one
+   * first: the pointer holds that part, and the offsets are measured from it.
+   */
+  private groupAround(id: number, whole: boolean): number[] {
+    const links = linksBetween(this.placed);
+    const group = whole ? connectedTo(id, links) : loadBearing(id, links);
+    return [id, ...[...group].filter((other) => other !== id)];
+  }
+
+  /** Take one placed part off the build, as a piece of a group. */
+  private lift(id: number, from: Vector3): Piece | null {
+    const brick = this.instances[id];
+    const placement = this.placements.get(id);
+    const part = brick
+      ? this.palette?.byFile.get(brick.partFile.toLowerCase())
+      : undefined;
+    if (!(brick && placement && part)) {
+      return null;
+    }
+    this.placements.delete(id);
+    this.placed.delete(id);
+    this.world?.removeStatic(id);
+    return {
+      brick,
+      offset: placement.position.clone().sub(from),
+      part,
+      tip: placement.tip,
+      yaw: placement.yaw,
+    };
+  }
+
+  /** Put a group on the pointer, measured as one shape. */
+  private hold(from: Carried["from"], parts: Piece[]): void {
+    if (parts.length === 0) {
+      return;
+    }
+    this.carried = {
+      blocked: false,
+      from,
+      nudge: { x: 0, y: 0, z: 0 },
+      parts,
+      profile: this.groupProfile(parts),
+      tracked: false,
+      velocity: new Vector3(),
+    };
+  }
+
+  /**
+   * The group as one column grid.
+   *
+   * Merged rather than kept as a list because everything downstream, resting
+   * and fitting alike, then costs what one part costs however many parts are in
+   * hand. A single part is its own profile and this is a no-op for it.
+   */
+  private groupProfile(parts: Piece[]): Profile {
+    const members: Member[] = parts.map((piece) => ({
+      offset: piece.offset,
+      profile: this.profileFor(piece.part, piece.yaw, piece.tip),
+    }));
+    return mergeProfiles(members);
   }
 
   // ----------------------------------------------------------- bookkeeping
@@ -692,12 +834,13 @@ export class FreeController {
     if (!(carried && palette)) {
       return;
     }
-    const replacement = this.makeInstance(carried.part, colorCode);
+    const [only] = carried.parts;
+    const replacement = this.makeInstance(only.part, colorCode);
     this.viewport.scene.add(replacement.object);
-    replacement.object.position.copy(carried.brick.object.position);
-    replacement.object.quaternion.copy(carried.brick.object.quaternion);
-    this.destroy(carried.brick.id);
-    carried.brick = replacement;
+    replacement.object.position.copy(only.brick.object.position);
+    replacement.object.quaternion.copy(only.brick.object.quaternion);
+    this.destroy(only.brick.id);
+    only.brick = replacement;
   }
 
   private dropLoose(brick: Brick, velocity: Vector3): void {
@@ -727,15 +870,18 @@ export class FreeController {
    * orientation, and the box that orientation gives it.
    */
   private poseOf(carried: Carried): void {
-    orientation(carried.yaw, carried.tip, this.quaternion);
+    // The part under the pointer sets the grid the group lands on. Everything
+    // else keeps the offset it was built at, which was already on that grid.
+    const [anchor] = carried.parts;
+    orientation(anchor.yaw, anchor.tip, this.quaternion);
     // The solid box, not the whole part: a brick lands on the body of the one
     // below it, and its own studs go inside whatever is put on top later.
     rotatedHalfExtents(
-      carried.part.solidHalfExtents,
+      anchor.part.solidHalfExtents,
       this.quaternion,
       this.halfExtents
     );
-    rotatedCenter(carried.part.solidCenter, this.quaternion, this.center);
+    rotatedCenter(anchor.part.solidCenter, this.quaternion, this.center);
   }
 
   /**
@@ -763,24 +909,29 @@ export class FreeController {
       return;
     }
     const { carried } = this;
+    // The part under the pointer speaks for the group: it is the one that was
+    // clicked, and the one the turn and the nudge are described relative to.
+    const anchor = carried?.parts[0];
     const progress: FreeProgress = {
-      carrying: carried
-        ? {
-            blocked: carried.blocked,
-            colorCode: carried.brick.colorCode,
-            file: carried.brick.partFile,
-            name: carried.part.name,
-            nudge: { ...carried.nudge },
-            tip: carried.tip,
-            yaw: carried.yaw,
-          }
-        : null,
+      carrying:
+        carried && anchor
+          ? {
+              blocked: carried.blocked,
+              colorCode: anchor.brick.colorCode,
+              count: carried.parts.length,
+              file: anchor.brick.partFile,
+              name: anchor.part.name,
+              nudge: { ...carried.nudge },
+              tip: anchor.tip,
+              yaw: anchor.yaw,
+            }
+          : null,
       loose: this.loose.size,
       placed: this.placements.size,
       problem: this.problem,
       ready: this.ready,
     };
-    const signature = `${progress.placed}:${progress.loose}:${progress.ready}:${progress.problem}:${carried?.brick.id ?? -1}:${carried?.yaw}:${carried?.tip}:${carried?.blocked}:${carried?.nudge.x},${carried?.nudge.y},${carried?.nudge.z}`;
+    const signature = `${progress.placed}:${progress.loose}:${progress.ready}:${progress.problem}:${anchor?.brick.id ?? -1}:${carried?.parts.length}:${anchor?.yaw}:${anchor?.tip}:${carried?.blocked}:${carried?.nudge.x},${carried?.nudge.y},${carried?.nudge.z}`;
     if (!force && signature === this.lastReport) {
       return;
     }
@@ -803,16 +954,41 @@ export class FreeController {
         file: this.instances[id]?.partFile ?? "",
         id,
       })),
-      placed: [...this.placements.values()].map((placement) => ({
-        c: placement.colorCode,
-        f: placement.file,
-        p: [placement.position.x, placement.position.y, placement.position.z],
-        t: placement.tip,
-        y: placement.yaw,
-      })),
+      placed: [...this.placements.values(), ...this.inHand()].map(
+        (placement) => ({
+          c: placement.colorCode,
+          f: placement.file,
+          p: [placement.position.x, placement.position.y, placement.position.z],
+          t: placement.tip,
+          y: placement.yaw,
+        })
+      ),
       updatedAt: Date.now(),
       v: 1,
     });
+  }
+
+  /**
+   * Where the parts in hand would land, written into the save with the rest.
+   *
+   * Anything being carried has already left `placements`, so a save taken while
+   * somebody is holding something, and one is taken the moment a tab goes to
+   * the background, would otherwise be a save with that hole in it. One brick
+   * short of a build is an annoyance; a subassembly short of one is a loss.
+   */
+  private inHand(): Placement[] {
+    const { carried } = this;
+    if (carried?.from !== "placed") {
+      return [];
+    }
+    return carried.parts.map((piece) => ({
+      colorCode: piece.brick.colorCode,
+      file: piece.brick.partFile,
+      id: piece.brick.id,
+      position: this.snapped.clone().add(piece.offset),
+      tip: piece.tip,
+      yaw: piece.yaw,
+    }));
   }
 
   private restore(): void {

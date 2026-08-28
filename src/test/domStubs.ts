@@ -79,8 +79,15 @@ export class FakeRenderer {
     // Nothing to release.
   }
 
-  render(): void {
+  /**
+   * The real renderer walks the graph before it draws, which is what leaves
+   * every object with a world matrix a raycast can use. A stub that only counts
+   * calls leaves them stale, and a test that clicks on a brick then hits
+   * whatever happens to be first in the list.
+   */
+  render(scene: { updateMatrixWorld: (force?: boolean) => void }): void {
     this.renders += 1;
+    scene.updateMatrixWorld();
   }
 
   setPixelRatio(): void {
