@@ -630,21 +630,34 @@ describe("SceneController dragging", () => {
   });
 });
 
+/**
+ * How far the camera ends up from the origin once it has finished moving.
+ *
+ * Re-framing flies rather than cuts, so a test that asks where the camera was
+ * taken has to run the move out first. One frame longer than the longest flight
+ * lands it exactly on the destination.
+ */
+function framedDistance(): number {
+  const { viewport } = controller as unknown as {
+    viewport: {
+      camera: { position: { length: () => number } };
+      updateCamera: (dt: number) => void;
+    };
+  };
+  viewport.updateCamera(10);
+  return viewport.camera.position.length();
+}
+
 describe("SceneController watch mode", () => {
   it("frames the table while assembling and the model while inspecting", () => {
     controller.setModel(buildableModel());
-    const { camera } = (
-      controller as unknown as {
-        viewport: { camera: { position: { length: () => number } } };
-      }
-    ).viewport;
 
     controller.setInput(input({ mode: "assemble" }));
-    const table = camera.position.length();
+    const table = framedDistance();
     controller.setInput(input({ mode: "explode" }));
 
     // The whole table is a bigger thing to fit on screen than the model alone.
-    expect(camera.position.length()).not.toBeCloseTo(table, 3);
+    expect(framedDistance()).not.toBeCloseTo(table, 3);
   });
 
   it("frames the staging area while watching, but not while building", () => {
@@ -669,18 +682,13 @@ describe("SceneController watch mode", () => {
       ],
     });
     controller.setModel(model);
-    const { camera } = (
-      controller as unknown as {
-        viewport: { camera: { position: { length: () => number } } };
-      }
-    ).viewport;
 
     controller.setInput(input({ mode: "assemble" }));
-    const watching = camera.position.length();
+    const watching = framedDistance();
 
     controller.setInput(input({ mode: "assemble", session: "build" }));
     controller.frameModel();
-    const building = camera.position.length();
+    const building = framedDistance();
 
     // Watching has to fit the staging area on screen as well as the model, so
     // it pulls back further than building, which never uses that ground.
@@ -737,16 +745,11 @@ describe("SceneController watch mode", () => {
   it("re-frames on request, and toggles between the two framings", () => {
     controller.setModel(buildableModel());
     controller.setInput(input());
-    const { camera } = (
-      controller as unknown as {
-        viewport: { camera: { position: { length: () => number } } };
-      }
-    ).viewport;
 
-    const before = camera.position.length();
+    const before = framedDistance();
     controller.frameModel(true);
 
-    expect(camera.position.length()).not.toBeCloseTo(before, 3);
+    expect(framedDistance()).not.toBeCloseTo(before, 3);
   });
 
   it("repaints the canvas for the theme it is asked for", () => {
