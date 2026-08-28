@@ -5,6 +5,8 @@ import { loadOmrIndex, type OmrSet, searchSets } from "@/lib/omrIndex";
 
 interface SetComboboxProps {
   disabled: boolean;
+  /** Sized for the front page's headline field rather than a card's. */
+  large?: boolean;
   onChange: (value: string) => void;
   /** Chosen from the list, rather than typed. Submits straight away. */
   onPick: (setId: string) => void;
@@ -27,6 +29,7 @@ const themeLabel = (set: OmrSet) =>
  */
 export function SetCombobox({
   disabled,
+  large = false,
   onChange,
   onPick,
   value,
@@ -105,7 +108,11 @@ export function SetCombobox({
         autoComplete="off"
         // 1rem keeps iOS from zooming the page on focus. The readout size is
         // fine once there is room for the zoom not to matter.
-        className="readout w-full border border-edge bg-panel-raised px-2 py-1.5 text-base text-ink placeholder:text-faint sm:text-[11px]"
+        className={`readout w-full border border-edge text-base text-ink placeholder:text-faint ${
+          large
+            ? "bg-panel px-3 py-2.5 sm:text-sm"
+            : "bg-panel-raised px-2 py-1.5 sm:text-[11px]"
+        }`}
         disabled={disabled}
         onBlur={() => {
           // Outlast the click that may be landing on an option.

@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "LDraw Builder: watch a LEGO model assemble itself, one build step at a time";
+  "LDraw Builder: watch a LEGO model build itself, then build one yourself";
 export const size = { height: 630, width: 1200 };
 export const contentType = "image/png";
 
@@ -57,28 +57,30 @@ export default function OpenGraphImage() {
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", maxWidth: 720 }}>
-        <div style={{ fontSize: 62, letterSpacing: -1, lineHeight: 1.12 }}>
-          Tip the bricks onto the floor and watch a model assemble itself.
+      {/*
+        The page's own heading, at the page's own weights. A card that is read
+        in a second in a feed cannot carry the paragraph and the feature list
+        that used to be here as well, and the four words below say what it is
+        for anyone the heading leaves guessing.
+      */}
+      <div style={{ display: "flex", flexDirection: "column", maxWidth: 760 }}>
+        <div style={{ fontSize: 68, letterSpacing: -1, lineHeight: 1.1 }}>
+          Watch it build itself.
         </div>
         <div
           style={{
             color: "#b3bac6",
-            fontSize: 27,
-            lineHeight: 1.4,
-            marginTop: 26,
+            fontSize: 68,
+            letterSpacing: -1,
+            lineHeight: 1.1,
           }}
         >
-          LDraw models in the browser. Follow the build step by step, explode
-          it, slice it open, or click any brick.
+          Then build it yourself.
         </div>
       </div>
 
-      <div style={{ color: "#8d95a2", display: "flex", fontSize: 21, gap: 40 }}>
-        <div>Build order</div>
-        <div>Explode</div>
-        <div>Layer slice</div>
-        <div>Part inspector</div>
+      <div style={{ color: "#8d95a2", display: "flex", fontSize: 23 }}>
+        LDraw models, in the browser.
       </div>
     </div>,
     size

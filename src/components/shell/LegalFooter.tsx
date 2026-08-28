@@ -69,6 +69,16 @@ export function LegalFooter({ compact = false }: { compact?: boolean }) {
           >
             LEGO Fair Play
           </a>
+          {/* Last, and pushed to the far end: the three above it are conditions
+              of using the library, this one is just who built the thing. */}
+          <a
+            className="ml-auto hover:text-ink"
+            href="https://thebuilder.dk"
+            rel="noreferrer noopener"
+            target="_blank"
+          >
+            Made by thebuilder
+          </a>
         </div>
       </div>
     </footer>

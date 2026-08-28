@@ -216,6 +216,26 @@
       background-color 120ms ease;
   }
 
+  /*
+    An icon-only button.
+
+    Sized to the box a hud-button with a word in it would have taken: one line
+    of type, the padding above, and the two hairlines box-sizing folds in. That
+    is what keeps it square without a magic number, and what keeps it the same
+    height as the labelled buttons it sits beside.
+
+    Both axes are written out because neither can be inferred. Equal padding
+    around the icon squares the box only until a labelled neighbour makes the
+    flex line taller than the glyph, and `aspect-ratio` does not help either: a
+    flex item is sized from its content first, so the ratio loses to a 14px
+    icon.
+  */
+  .hud-square {
+    width: calc(1lh + 0.8rem + 2px);
+    height: calc(1lh + 0.8rem + 2px);
+    padding: 0;
+  }
+
   .hud-button:hover:not(:disabled) {
     color: var(--color-ink);
     background: var(--color-panel-hover);
@@ -235,6 +255,36 @@
     color: var(--color-on-accent);
     background: var(--color-accent);
     border-color: var(--color-accent);
+  }
+
+  /*
+    An indeterminate bar, for waits whose length is not knowable in advance:
+    packing a set fetches every part it uses, and how many that is is exactly
+    what nobody knows until it is done. A segment that travels says the app is
+    still working; a static one that fills would be a lie about how far along
+    it is.
+  */
+  .progress-track {
+    overflow: hidden;
+    background: var(--color-edge);
+  }
+
+  .progress-track::after {
+    display: block;
+    width: 34%;
+    height: 100%;
+    content: "";
+    background: var(--color-accent-fg);
+    animation: progress-slide 1.4s ease-in-out infinite;
+  }
+
+  @keyframes progress-slide {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(394%);
+    }
   }
 
   /* Needs to outrank the plain hover rule, which is why it repeats the state. */

@@ -38,7 +38,7 @@ function stubApi(setResponse: () => Promise<Response>) {
 }
 
 const OPEN_BUTTON = /open/i;
-const TAKES_A_MOMENT = /takes a few seconds/i;
+const TAKES_A_MOMENT = /only the first open is slow/i;
 const NOT_IN_OMR = /not in the OMR/;
 const COULD_NOT_OPEN = /could not be opened/i;
 const COULD_NOT_REACH = /could not reach/i;

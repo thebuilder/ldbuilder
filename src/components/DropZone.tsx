@@ -142,29 +142,30 @@ export function DropZone({ className = "" }: { className?: string }) {
   const working = status.kind === "working";
 
   return (
-    <div className={`flex h-full flex-col ${className}`}>
+    <div className={`flex flex-col ${className}`}>
+      {/*
+        A strip rather than a card: bringing your own file is a real way in, but
+        it is the one that presumes you already have an .ldr on disk, so it sits
+        under the two that presume nothing and takes a line rather than a tile.
+      */}
       <button
-        className="group flex h-full w-full flex-col justify-between gap-6 border-2 border-accent/35 border-dashed bg-accent/[0.045] p-5 text-left transition-colors hover:border-accent/70 hover:bg-accent/10 disabled:opacity-60 data-[dragging=true]:border-accent data-[dragging=true]:bg-accent/15"
+        className="group flex w-full flex-wrap items-center gap-x-4 gap-y-2 border border-edge border-dashed bg-panel px-5 py-4 text-left transition-colors hover:border-accent/70 hover:bg-accent/[0.06] disabled:opacity-60 data-[dragging=true]:border-accent data-[dragging=true]:bg-accent/15"
         data-dragging={dragging}
         disabled={working}
         onClick={() => inputRef.current?.click()}
         type="button"
       >
-        <div>
-          <h3 className="flex items-center gap-2 text-accent-fg text-base">
-            <Upload className="h-4 w-4" />
-            {dragging ? "Release to open" : "Bring your own"}
-          </h3>
-          <p className="mt-2 text-muted text-sm leading-relaxed">
-            {working
-              ? `Working: ${status.detail}…`
-              : "Drop an .ldr or .mpd anywhere on this page, or click to browse."}
-          </p>
-        </div>
-
-        <p className="readout border-accent/25 border-t pt-3 text-faint">
-          Packed .mpd opens instantly. A raw .ldr is resolved against the parts
-          library.
+        <h3 className="flex items-center gap-2 text-accent-fg text-sm">
+          <Upload className="h-4 w-4" />
+          {dragging ? "Release to open" : "Bring your own"}
+        </h3>
+        <p className="text-muted text-sm leading-relaxed">
+          {working
+            ? `Working: ${status.detail}…`
+            : "Drop an .ldr or .mpd anywhere on this page, or click to browse."}
+        </p>
+        <p className="readout ml-auto text-faint">
+          Packed .mpd opens instantly; a raw .ldr is resolved first
         </p>
       </button>
 

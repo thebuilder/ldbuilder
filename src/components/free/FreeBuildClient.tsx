@@ -104,8 +104,11 @@ function FreeHud(props: FreeHudProps) {
       <div className="flex h-full min-h-0 w-80 flex-col gap-3">
         <div className="panel pointer-events-auto flex shrink-0 items-start gap-4 px-4 py-3">
           <div>
+            {/* Padded out and pulled back in: a 10px label on a line-height of 1
+                is a 10px target, which is nothing to hit. The margin cancels the
+                padding, so the box grows without the type moving. */}
             <Link
-              className="label inline-flex items-center gap-1.5 hover:text-ink"
+              className="label -m-2.5 inline-flex items-center gap-1.5 p-2.5 hover:text-ink"
               href="/"
             >
               <ChevronLeft className="h-3 w-3" />
@@ -116,7 +119,7 @@ function FreeHud(props: FreeHudProps) {
               {parts} parts available
             </p>
           </div>
-          <ThemeToggle className="ml-auto px-2 py-1" />
+          <ThemeToggle className="ml-auto" />
         </div>
 
         <PartsInventory

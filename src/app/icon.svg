@@ -1,9 +1,22 @@
 <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
   <title>LDraw Builder</title>
-  <rect fill="#0e0f12" height="32" rx="6" width="32" />
-  <!-- A 2x2 brick seen from the front: studs on top, body below. -->
-  <rect fill="#6fb2f5" height="4" rx="1.2" width="5" x="8" y="8" />
-  <rect fill="#6fb2f5" height="4" rx="1.2" width="5" x="19" y="8" />
-  <rect fill="#1c6bd6" height="13" rx="2" width="20" x="6" y="11" />
-  <rect fill="#2b7ae2" height="3" opacity="0.5" width="20" x="6" y="11" />
+  <!--
+    The wordmark's three squares, folded into a 2x2 and run to the edges.
+
+    Drawn for 16px, which is the size a favicon is actually seen at. Anything
+    with a stud, a seam or a border on it turns to mush there; four quadrants of
+    flat colour do not.
+
+    The fourth quadrant is filled rather than left transparent. Browsers mask a
+    favicon with rounded corners, and an empty corner under that mask does not
+    read as a gap in a grid, it reads as a bite taken out of a blob. Filled with
+    the app's own ground it stays a square, and it is still the odd one out.
+
+    The blue is the accent rather than the wordmark's darker brick blue: with no
+    tile under it, that one closes up against the dark quadrant.
+  -->
+  <rect fill="#e3000b" height="16" width="16" x="0" y="0" />
+  <rect fill="#f5c518" height="16" width="16" x="16" y="0" />
+  <rect fill="#1c6bd6" height="16" width="16" x="0" y="16" />
+  <rect fill="#0e0f12" height="16" width="16" x="16" y="16" />
 </svg>

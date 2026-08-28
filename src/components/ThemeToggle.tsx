@@ -37,7 +37,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   return (
     <button
       aria-label={mounted ? `Switch to ${next} theme` : "Switch theme"}
-      className={`hud-button ${className}`}
+      className={`hud-button hud-square ${className}`}
       onClick={() => setTheme(next)}
       title={mounted ? `Switch to ${next} theme` : "Switch theme"}
       type="button"
