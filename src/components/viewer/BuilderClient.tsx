@@ -556,6 +556,7 @@ function BuilderHud(props: BuilderHudProps) {
         onGoToStep={props.onGoToStep}
         onHoverEntry={props.onHoverEntry}
         onIsolate={props.onIsolate}
+        session={session}
         step={step}
       />
 
@@ -637,6 +638,7 @@ interface SidePanelsProps {
   onGoToStep?: (step: number) => void;
   onHoverEntry: (entry: BomEntry | null) => void;
   onIsolate: (path: string | null) => void;
+  session: SessionMode;
   step: number;
 }
 
@@ -646,6 +648,7 @@ function SidePanels({
   inspected,
   isolate,
   bom,
+  session,
   step,
   onIsolate,
   onClearSelection,
@@ -675,6 +678,7 @@ function SidePanels({
           bricks={model.bricks}
           hoveredKey={bom?.key ?? null}
           onHover={onHoverEntry}
+          session={session}
           step={step}
           steps={model.steps}
         />

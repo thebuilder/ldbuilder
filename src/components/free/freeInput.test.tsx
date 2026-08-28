@@ -17,6 +17,7 @@ afterEach(() => {
 const carrying = (over: Partial<CarriedInfo> = {}): CarriedInfo => ({
   blocked: false,
   colorCode: 4,
+  count: 1,
   file: "3001.dat",
   name: "Brick 2 x 4",
   nudge: { x: 0, y: 0, z: 0 },
@@ -43,6 +44,24 @@ describe("CarryHud", () => {
 
     render(<CarryHud carrying={carrying({ tip: 1 })} loose={0} placed={0} />);
     expect(screen.getByText("90°")).toBeDefined();
+  });
+
+  it("says how much came up with a subassembly", () => {
+    render(<CarryHud carrying={carrying({ count: 4 })} loose={0} placed={0} />);
+
+    expect(screen.getByText("3")).toBeDefined();
+    expect(screen.getByText(/attached/)).toBeDefined();
+  });
+
+  it("drops the tip key from a subassembly, which cannot be tipped", () => {
+    render(<CarryHud carrying={carrying()} loose={0} placed={0} />);
+    expect(screen.getByText("Tip")).toBeDefined();
+    cleanup();
+
+    render(<CarryHud carrying={carrying({ count: 2 })} loose={0} placed={0} />);
+    expect(screen.queryByText("Tip")).toBeNull();
+    // The turn key stays: about the upright is the one turn a group has.
+    expect(screen.getByText("R")).toBeDefined();
   });
 
   it("warns rather than inviting a click when the part will not fit", () => {

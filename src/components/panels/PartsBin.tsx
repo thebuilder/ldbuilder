@@ -3,28 +3,44 @@
 import { useMemo, useState } from "react";
 import { colorHex, colorName, isTranslucent } from "@/ldraw/colors.generated";
 import { partNumber } from "@/ldraw/mpd";
-import type { BomEntry, Brick, StepInfo } from "@/ldraw/types";
+import type { BomEntry, Brick, SessionMode, StepInfo } from "@/ldraw/types";
 
 export interface PartsBinProps {
   bom: BomEntry[];
   bricks: Brick[];
   hoveredKey: string | null;
   onHover: (entry: BomEntry | null) => void;
+  session: SessionMode;
   step: number;
   steps: StepInfo[];
 }
 
 type Scope = "all" | "step";
 
+const scopeFor = (session: SessionMode): Scope =>
+  session === "build" ? "step" : "all";
+
 export function PartsBin({
   bom,
   bricks,
   steps,
   step,
+  session,
   hoveredKey,
   onHover,
 }: PartsBinProps) {
-  const [scope, setScope] = useState<Scope>("all");
+  const [scope, setScope] = useState<Scope>(() => scopeFor(session));
+
+  // Build mode is a question about one step - what am I looking for now - so it
+  // opens on that step rather than on the whole model's parts list. Adjusted
+  // during render rather than in an effect so the panel never paints the wrong
+  // scope first. A scope chosen by hand afterwards stands until the flow
+  // changes again.
+  const [lastSession, setLastSession] = useState(session);
+  if (session !== lastSession) {
+    setLastSession(session);
+    setScope(scopeFor(session));
+  }
 
   // The step scope rebuilds a small BOM from just this step's bricks, so the
   // counts show what to pick up now rather than a running total.

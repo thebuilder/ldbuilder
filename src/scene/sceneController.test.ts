@@ -171,6 +171,102 @@ describe("SceneController build mode", () => {
     expect(model.bricks[2].object.position.x).toBeCloseTo(200, 0);
   });
 
+  it("carries the step being watched into the build", () => {
+    const latest = watchProgress();
+    const model = buildableModel();
+    controller.setModel(model);
+    controller.setInput(input({ session: "watch", step: 1 }));
+
+    controller.setInput(input({ session: "build", step: 1 }));
+
+    // The first step is already in the model, so only the second one's pieces
+    // are on the floor to look through.
+    expect(latest()).toMatchObject({
+      loose: 2,
+      placedTotal: 2,
+      resumed: false,
+      step: 1,
+    });
+    expect(latest()?.pending).toEqual([2, 3]);
+  });
+
+  it("hands back the last step rather than a finished model", () => {
+    const latest = watchProgress();
+    controller.setModel(buildableModel());
+
+    // Playing a model through and then pressing build is a normal way to get
+    // here, and a build with nothing left to do is a dead end.
+    controller.setInput(input({ session: "build", step: 2 }));
+
+    expect(latest()).toMatchObject({ done: false, step: 1 });
+  });
+
+  it("says upward when the build starts on a different step", () => {
+    writeBuild({
+      bricks: 4,
+      loose: [],
+      placed: [0, 1],
+      slug: "test-build",
+      step: 1,
+      steps: 2,
+      title: "Test Model",
+      updatedAt: 1,
+      v: 1,
+    });
+    const steps: number[] = [];
+    controller.setCallbacks({ onStepAdvance: (step) => steps.push(step) });
+    controller.setModel(buildableModel());
+
+    controller.setInput(input({ session: "build", step: 0 }));
+
+    // Otherwise the parts list would still be reading off step one.
+    expect(steps).toEqual([1]);
+  });
+
+  it("keeps a saved build that is further on than the step being watched", () => {
+    writeBuild({
+      bricks: 4,
+      loose: [],
+      placed: [0, 1],
+      slug: "test-build",
+      step: 1,
+      steps: 2,
+      title: "Test Model",
+      updatedAt: 1,
+      v: 1,
+    });
+
+    const latest = watchProgress();
+    controller.setModel(buildableModel());
+
+    // The save is further on than the step on screen, so it wins: a build
+    // opened from the start of the model should not throw a step away.
+    controller.setInput(input({ session: "build", step: 0 }));
+
+    expect(latest()).toMatchObject({ placedTotal: 2, resumed: true, step: 1 });
+  });
+
+  it("does not announce a build that starts where the url already said", () => {
+    const latest = watchProgress();
+    writeBuild({
+      bricks: 4,
+      loose: [],
+      placed: [0, 1],
+      slug: "test-build",
+      step: 1,
+      steps: 2,
+      title: "Test Model",
+      updatedAt: 1,
+      v: 1,
+    });
+    controller.setModel(buildableModel());
+
+    controller.setInput(input({ session: "build", step: 1 }));
+
+    // The notice explains a jump, and there was none to explain.
+    expect(latest()).toMatchObject({ resumed: false, step: 1 });
+  });
+
   it("refuses a save written against a different model", () => {
     writeBuild({
       bricks: 99,

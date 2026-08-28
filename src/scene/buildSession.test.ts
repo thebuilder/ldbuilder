@@ -135,6 +135,19 @@ describe("BuildSession", () => {
     expect(session.pendingSlots).toEqual([2, 3]);
   });
 
+  it("fills in the steps before the one it is told to start at", () => {
+    const session = new BuildSession(model());
+
+    // Switching into build mode partway through: the earlier steps are in the
+    // model by definition, whether or not anyone placed them by hand.
+    session.restore(2);
+
+    expect(session.step).toBe(2);
+    expect(session.placedCount).toBe(4);
+    expect(session.pendingSlots).toEqual([4, 5]);
+    expect(session.looseIds()).toEqual([4, 5]);
+  });
+
   it("drops slot ids a save should not contain", () => {
     const session = new BuildSession(model());
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Vector3 } from "three";
+import type { Quaternion, Vector3 } from "three";
 import {
   afterEach,
   beforeAll,
@@ -76,8 +76,8 @@ function watch(): () => FreeProgress | null {
   return () => latest;
 }
 
-/** Point straight down at the floor, so a click lands where it looks. */
-function lookDown(): void {
+/** Point straight down at a spot on the floor, so a click lands where it looks. */
+function lookDownAt(x: number, z: number): void {
   const { viewport } = controller as unknown as {
     viewport: {
       camera: {
@@ -88,26 +88,93 @@ function lookDown(): void {
       controls: { target: { set: (x: number, y: number, z: number) => void } };
     };
   };
-  viewport.camera.position.set(0, 600, 0);
-  viewport.controls.target.set(0, 0, 0);
-  viewport.camera.lookAt(0, 0, 0);
+  viewport.camera.position.set(x, 600, z);
+  viewport.controls.target.set(x, 0, z);
+  viewport.camera.lookAt(x, 0, z);
   viewport.camera.updateMatrixWorld(true);
+}
+
+const lookDown = () => lookDownAt(0, 0);
+
+/**
+ * Point straight down the middle of a brick.
+ *
+ * A poured brick lands wherever the pile puts it, so a test that means to click
+ * on one has to go and find it. Down the middle of the body rather than at the
+ * origin, which sits on the part's own top face and would only ever graze it.
+ */
+function lookDownAtBrick(id: number): void {
+  const { instances } = controller as unknown as {
+    instances: {
+      localCenter: Vector3;
+      object: { position: Vector3; quaternion: Quaternion };
+    }[];
+  };
+  const brick = instances[id];
+  const middle = brick.localCenter
+    .clone()
+    .applyQuaternion(brick.object.quaternion)
+    .add(brick.object.position);
+  lookDownAt(middle.x, middle.z);
 }
 
 const pointer = (
   type: string,
-  x = VIEWPORT.width / 2,
-  y = VIEWPORT.height / 2
+  over: { shiftKey?: boolean; x?: number; y?: number } = {}
 ) =>
   new PointerEvent(type, {
     bubbles: true,
     button: 0,
     buttons: type === "pointerup" ? 0 : 1,
     cancelable: true,
-    clientX: x,
-    clientY: y,
+    clientX: over.x ?? VIEWPORT.width / 2,
+    clientY: over.y ?? VIEWPORT.height / 2,
     pointerId: 1,
+    shiftKey: over.shiftKey ?? false,
   });
+
+type Saved = Parameters<typeof writeFreeBuild>[0]["placed"];
+
+/** Open onto a build laid out exactly, so a test can click a known brick. */
+const openBuild = async (placed: Saved) => {
+  writeFreeBuild({ loose: [], looseParts: [], placed, updatedAt: 1, v: 1 });
+  await controller.open(palette(), true);
+  await run();
+  lookDown();
+};
+
+/**
+ * Click a brick by id.
+ *
+ * Through the private method rather than through the canvas because half of
+ * what is being tested is picking a brick up from *under* something, and a ray
+ * cast from the camera can only ever reach the brick on top.
+ */
+const grab = (id: number, whole = false) =>
+  (
+    controller as unknown as { pickUp: (id: number, whole: boolean) => void }
+  ).pickUp(id, whole);
+
+/** Every placement, as the x, y, z LDraw writes it at. */
+const positions = () =>
+  controller
+    .toLdraw("test")
+    .split("\n")
+    .filter((row) => row.startsWith("1 "))
+    .map((row) => row.split(" ").slice(2, 5).map(Number));
+
+/** A brick on the floor with a second square on top of it. */
+const STACK: Saved = [
+  { c: 4, f: "3001.dat", p: [0, 24, 0], t: 0, y: 0 },
+  { c: 4, f: "3001.dat", p: [0, 48, 0], t: 0, y: 0 },
+];
+
+/** Two 1 x 1 legs with a 2 x 4 lying across both of them. */
+const BRIDGE: Saved = [
+  { c: 4, f: "3005.dat", p: [-10, 24, 0], t: 0, y: 0 },
+  { c: 4, f: "3005.dat", p: [10, 24, 0], t: 0, y: 0 },
+  { c: 4, f: "3001.dat", p: [0, 48, 0], t: 0, y: 0 },
+];
 
 /**
  * Move the pointer across the floor a frame at a time, without stopping.
@@ -124,7 +191,7 @@ async function swing(): Promise<void> {
     (previous, step) =>
       previous.then(() => {
         canvas.dispatchEvent(
-          pointer("pointermove", VIEWPORT.width / 2 + step * 30)
+          pointer("pointermove", { x: VIEWPORT.width / 2 + step * 30 })
         );
         return frames(2);
       }),
@@ -354,11 +421,125 @@ describe("FreeController", () => {
     expect(latest()?.placed).toBe(1);
   });
 
+  it("brings up whatever the picked part alone was holding", async () => {
+    const latest = watch();
+    await openBuild(STACK);
+
+    // The brick underneath is what the one on top is standing on, so taking it
+    // out of the build takes the one on top out with it, still stacked.
+    grab(0);
+
+    expect(latest()?.carrying?.count).toBe(2);
+    expect(latest()?.placed).toBe(0);
+  });
+
+  it("leaves a part that still has a leg under it", async () => {
+    const latest = watch();
+    await openBuild(BRIDGE);
+
+    grab(0);
+
+    expect(latest()?.carrying?.count).toBe(1);
+    expect(latest()?.placed).toBe(2);
+  });
+
+  it("takes the whole subassembly when shift is held", async () => {
+    const latest = watch();
+    await openBuild(BRIDGE);
+
+    // Clicked a leg, and the deck and the far leg come too: shift means the
+    // piece of the build, not the part.
+    grab(0, true);
+
+    expect(latest()?.carrying?.count).toBe(3);
+    expect(latest()?.placed).toBe(0);
+  });
+
+  it("reads shift off the click that picks a brick up", async () => {
+    const latest = watch();
+    await openBuild(STACK);
+
+    canvas.dispatchEvent(pointer("pointerdown", { shiftKey: true }));
+
+    // Straight down onto the top brick, which is holding nothing up. Only the
+    // shift makes the one underneath come with it.
+    expect(latest()?.carrying?.count).toBe(2);
+  });
+
+  it("picks up only what was clicked without shift", async () => {
+    const latest = watch();
+    await openBuild(STACK);
+
+    canvas.dispatchEvent(pointer("pointerdown"));
+
+    expect(latest()?.carrying?.count).toBe(1);
+    expect(latest()?.placed).toBe(1);
+  });
+
+  it("puts a subassembly back down as separate placements", async () => {
+    const latest = watch();
+    await openBuild(STACK);
+    grab(0);
+    await run();
+
+    canvas.dispatchEvent(pointer("pointerdown"));
+
+    expect(latest()?.placed).toBe(2);
+    expect(latest()?.carrying).toBeNull();
+    // Still a stack: a group is a way of moving parts, not something the
+    // finished build knows about.
+    expect(positions()).toEqual([
+      [0, -24, 0],
+      [0, -48, 0],
+    ]);
+  });
+
+  it("turns a subassembly about the upright, keeping it together", async () => {
+    await openBuild([
+      { c: 4, f: "3001.dat", p: [0, 24, 0], t: 0, y: 0 },
+      { c: 4, f: "3005.dat", p: [10, 48, 30], t: 0, y: 0 },
+    ]);
+    grab(0);
+
+    controller.rotate(1, 0);
+    await run();
+    canvas.dispatchEvent(pointer("pointerdown"));
+
+    // The 1 x 1 was a stud right and a stud and a half back of the middle of
+    // the 2 x 4; a quarter turn puts it a stud and a half right and half a stud
+    // forward, still on top. LDraw counts y and z the other way round.
+    expect(positions()).toEqual([
+      [0, -24, 0],
+      [30, -48, 10],
+    ]);
+  });
+
+  it("will not tip a subassembly, because a group has no tipped pose", async () => {
+    const latest = watch();
+    await openBuild(STACK);
+    grab(0);
+
+    controller.rotate(0, 1);
+
+    expect(latest()?.carrying).toMatchObject({ count: 2, tip: 0 });
+  });
+
+  it("gives a whole subassembly back to the floor when it is cancelled", async () => {
+    const latest = watch();
+    await openBuild(STACK);
+    grab(0);
+
+    controller.cancelCarry();
+
+    expect(latest()).toMatchObject({ loose: 2, placed: 0 });
+  });
+
   it("gives a part back to the floor when carrying is cancelled", async () => {
     const latest = watch();
     await open();
     controller.pourOut("3001.dat", RED, 1);
     await run();
+    lookDownAtBrick(0);
     canvas.dispatchEvent(pointer("pointerdown"));
     expect(latest()?.loose).toBe(0);
 
@@ -377,6 +558,7 @@ describe("FreeController", () => {
 
     controller.pourOut("3001.dat", RED, 1);
     await run();
+    lookDownAtBrick(0);
     canvas.dispatchEvent(pointer("pointerdown"));
     await swing();
     controller.cancelCarry();
@@ -396,6 +578,7 @@ describe("FreeController", () => {
 
     controller.pourOut("3001.dat", RED, 1);
     await run();
+    lookDownAtBrick(0);
     canvas.dispatchEvent(pointer("pointerdown"));
     await run(12);
     controller.cancelCarry();
@@ -418,6 +601,7 @@ describe("FreeController", () => {
     await open();
     controller.pourOut("3001.dat", RED, 1);
     await run();
+    lookDownAtBrick(0);
     canvas.dispatchEvent(pointer("pointerdown"));
 
     controller.deleteCarried();
@@ -437,6 +621,18 @@ describe("FreeController", () => {
 
     expect(latest()).toMatchObject({ carrying: null, loose: 0, placed: 0 });
     expect(controller.toLdraw("test")).not.toContain("\n1 ");
+  });
+
+  it("keeps a subassembly in the save while it is in hand", async () => {
+    await openBuild(STACK);
+    grab(0);
+    await run();
+    controller.dispose();
+
+    // A tab going to the background saves, and everything in hand has already
+    // left the build. Losing a brick that way is an annoyance; losing the piece
+    // of the model somebody was moving is not.
+    expect(readFreeBuild()?.placed).toHaveLength(2);
   });
 
   it("writes the build out and reads it back", async () => {
