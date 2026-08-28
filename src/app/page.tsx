@@ -31,7 +31,7 @@ export default async function GalleryPage() {
               <span aria-hidden className="h-3 w-3 bg-brick-yellow" />
               <span aria-hidden className="h-3 w-3 bg-brick-blue" />
               <h1 className="font-mono text-lg uppercase tracking-[0.2em]">
-                LDraw Builder
+                LDBuilder
               </h1>
             </div>
             <ThemeToggle />

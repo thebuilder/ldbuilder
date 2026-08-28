@@ -15,7 +15,7 @@ const LIST_URL = "https://library.ldraw.org/omr/sets";
 
 /** Identify the scraper, so the maintainers can see who is asking. */
 const USER_AGENT =
-  "ldraw-builder set-index builder (+https://github.com/thebuilder/ldraw-builder)";
+  "ldbuilder set-index builder (+https://github.com/thebuilder/ldbuilder)";
 
 const ROW = /<tr[^>]*>(.*?)<\/tr>/gs;
 const CELL = /<t[dh][^>]*>(.*?)<\/t[dh]>/gs;
