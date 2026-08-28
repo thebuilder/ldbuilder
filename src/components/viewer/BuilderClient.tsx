@@ -595,8 +595,11 @@ function HudHeader({
     <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="panel pointer-events-auto flex items-start gap-4 px-4 py-3">
         <div>
+          {/* Padded out and pulled back in: a 10px label on a line-height of 1
+              is a 10px target, which is nothing to hit. The margin cancels the
+              padding, so the box grows without the type moving. */}
           <Link
-            className="label inline-flex items-center gap-1.5 hover:text-ink"
+            className="label -m-2.5 inline-flex items-center gap-1.5 p-2.5 hover:text-ink"
             href="/"
           >
             <ChevronLeft className="h-3 w-3" />
@@ -608,7 +611,7 @@ function HudHeader({
             {model.bags.length > 1 && <> &middot; {model.bags.length} bags</>}
           </p>
         </div>
-        <ThemeToggle className="ml-auto px-2 py-1" />
+        <ThemeToggle className="ml-auto" />
       </div>
 
       <div className="flex flex-col items-stretch gap-3 sm:items-end">
@@ -986,9 +989,7 @@ function Overlay({
         ) : (
           <>
             <p className="readout mt-2 text-faint">{describe(progress)}</p>
-            <div className="mt-4 h-0.5 w-full overflow-hidden bg-edge">
-              <div className="h-full w-1/3 animate-pulse bg-accent-fg" />
-            </div>
+            <div className="progress-track mt-4 h-0.5 w-full" />
           </>
         )}
       </div>

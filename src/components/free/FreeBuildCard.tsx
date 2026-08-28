@@ -12,7 +12,7 @@ import { freeBuildSummary } from "@/lib/freeStore";
  * localStorage does not exist on the server and a build somebody left on the
  * floor is the best reason to come back.
  */
-export function FreeBuildCard() {
+export function FreeBuildCard({ className = "" }: { className?: string }) {
   const [placed, setPlaced] = useState<number | null>(null);
 
   useEffect(() => {
@@ -21,15 +21,15 @@ export function FreeBuildCard() {
 
   return (
     <Link
-      className="group flex h-full flex-col justify-between gap-6 bg-panel p-5 shadow-[0_0_0_1px_var(--color-edge)] transition-colors hover:bg-panel-raised"
+      className={`group flex h-full flex-col justify-between gap-6 bg-panel p-6 shadow-[0_0_0_1px_var(--color-edge)] transition-colors hover:bg-panel-raised sm:p-8 ${className}`}
       href="/free"
     >
       <div>
-        <h3 className="flex items-center gap-2 text-base text-ink transition-colors group-hover:text-accent-fg">
-          <Brick />
+        <h3 className="flex items-center gap-2 text-ink text-xl transition-colors group-hover:text-accent-fg">
+          <Brick className="h-5 w-5" />
           Free build
         </h3>
-        <p className="mt-2 text-muted text-sm leading-relaxed">
+        <p className="mt-2 text-base text-muted leading-relaxed">
           No instructions. Tip out whatever parts you like and build something;
           bricks snap to the stud grid, and you can export it as an LDraw file.
         </p>

@@ -196,3 +196,18 @@ export function Save({ className = "h-3.5 w-3.5" }: IconProps) {
     </Glyph>
   );
 }
+
+/**
+ * A spinner for waits with no measurable progress.
+ *
+ * Drawn as a ring with a gap rather than a partial arc plus a full circle, so
+ * the thing that turns is the only thing on screen and there is nothing behind
+ * it to alias against at 14px.
+ */
+export function Spinner({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <Glyph className={className}>
+      <path d="M8 2.2a5.8 5.8 0 1 0 5.8 5.8" />
+    </Glyph>
+  );
+}
