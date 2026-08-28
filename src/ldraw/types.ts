@@ -132,6 +132,15 @@ export interface ModelData {
   bom: BomEntry[];
   bounds: Box3;
   bricks: Brick[];
+  /**
+   * Who to credit for the model itself, shown in the viewer.
+   *
+   * The parts library's attribution is in the footer on every route, but that
+   * covers the bricks, not the person who built the thing out of them. CC BY
+   * wants the author of an OMR set named wherever the set is shown, and the
+   * viewer is where a deep link lands.
+   */
+  credit: string | null;
   /** Brick count reported by the packer, for cross-checking the flatten pass. */
   expectedBricks: number | null;
   /** Container holding every brick. Sits under the scale/centre transform. */

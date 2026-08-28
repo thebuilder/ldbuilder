@@ -257,12 +257,15 @@ export function toLdrawFile(placements: Placement[], title: string): string {
   const quaternion = new Quaternion();
   const scale = new Vector3(1, 1, 1);
 
+  // No Author and no !LICENSE line, deliberately. A free build is the person's
+  // own model, so this app is not its author and has no business licensing it on
+  // their behalf; both lines are theirs to add. Nor does it owe the parts library
+  // an attribution: the file references parts by name and includes no part source,
+  // which is the case CAreadme.txt names as not a derivative work.
   const lines = [
     `0 ${title}`,
     "0 Name: untitled.ldr",
-    "0 Author: LDraw Builder",
     "0 !LDRAW_ORG Unofficial_Model",
-    "0 !LICENSE Redistributable under CCAL version 2.0 : see CAreadme.txt",
     "",
   ];
 

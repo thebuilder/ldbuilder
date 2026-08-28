@@ -56,16 +56,23 @@ const LOAD_FAILED = "Could not load this model.";
 const failureMessage = (caught: unknown): string =>
   caught instanceof Error ? caught.message : LOAD_FAILED;
 
+interface ModelSource {
+  /** Attribution shown next to the title. Null for a file somebody dropped in. */
+  credit: string | undefined;
+  expectedBricks: number | undefined;
+  title: string | undefined;
+}
+
 /** A dropped file carries its own packed text; anything else is fetched. */
 function loadOptionsFor(
   slug: string,
-  title: string | undefined,
-  expectedBricks: number | undefined,
+  source: ModelSource,
   upload: UploadedModel | null,
   onProgress: (progress: LoadProgress) => void
 ): LoadModelOptions {
   if (upload) {
     return {
+      credit: upload.credit ?? null,
       onProgress,
       partNames: upload.partNames,
       slug,
@@ -74,10 +81,11 @@ function loadOptionsFor(
     };
   }
   return {
-    expectedBricks: expectedBricks ?? null,
+    credit: source.credit ?? null,
+    expectedBricks: source.expectedBricks ?? null,
     onProgress,
     slug,
-    title: title ?? slug,
+    title: source.title ?? slug,
     url: `/models/${slug}.mpd`,
   };
 }
@@ -112,11 +120,15 @@ export function BuilderClient({ slug, meta }: BuilderClientProps) {
     { clearOnDefault: true, history: "replace", throttleMs: 250 }
   );
 
-  const { model, progress, error, missingParts } = useModelLoader(
-    slug,
-    meta?.title,
-    meta?.bricks
+  const source = useMemo(
+    () => ({
+      credit: meta?.credit,
+      expectedBricks: meta?.bricks,
+      title: meta?.title,
+    }),
+    [meta?.credit, meta?.bricks, meta?.title]
   );
+  const { model, progress, error, missingParts } = useModelLoader(slug, source);
 
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
@@ -376,11 +388,7 @@ interface LoadedModel {
  * abandoned load has to be cancelled and its geometry disposed, or switching
  * models twice quickly leaks a model's worth of buffers onto the GPU.
  */
-function useModelLoader(
-  slug: string,
-  metaTitle: string | undefined,
-  metaBricks: number | undefined
-): LoadedModel {
+function useModelLoader(slug: string, source: ModelSource): LoadedModel {
   const [model, setModel] = useState<ModelData | null>(null);
   const [progress, setProgress] = useState<LoadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -417,7 +425,7 @@ function useModelLoader(
       const physics = loadPhysics();
 
       const result = await loadModel(
-        loadOptionsFor(slug, metaTitle, metaBricks, upload, onProgress)
+        loadOptionsFor(slug, source, upload, onProgress)
       );
       await physics;
       loaded = result;
@@ -444,7 +452,7 @@ function useModelLoader(
         disposeModel(loaded);
       }
     };
-  }, [slug, metaTitle, metaBricks]);
+  }, [slug, source]);
 
   return { error, missingParts, model, progress };
 }
@@ -606,6 +614,9 @@ function HudHeader({
             All models
           </Link>
           <h1 className="mt-2 text-ink text-sm">{model.title}</h1>
+          {model.credit ? (
+            <p className="readout mt-1 text-faint">Built by {model.credit}</p>
+          ) : null}
           <p className="readout tabular mt-1 text-faint">
             {model.bricks.length} bricks &middot; {model.steps.length} steps
             {model.bags.length > 1 && <> &middot; {model.bags.length} bags</>}

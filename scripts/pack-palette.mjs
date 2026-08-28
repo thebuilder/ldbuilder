@@ -15,7 +15,11 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { buildLibraryIndex, packModel } from "./lib/ldraw-pack.mjs";
+import {
+  buildLibraryIndex,
+  localResolver,
+  packModel,
+} from "./lib/ldraw-pack.mjs";
 import { selectPaletteParts } from "./lib/palette-select.mjs";
 import { LIBRARY_DIR, PUBLIC_PARTS_DIR } from "./lib/paths.mjs";
 
@@ -76,8 +80,8 @@ async function main() {
   ].join("\n");
 
   const { mpd, partNames, missing, stats } = await packModel({
-    index,
     name: "palette.ldr",
+    resolve: localResolver(index),
     text: source,
   });
 

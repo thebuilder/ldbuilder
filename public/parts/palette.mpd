@@ -2,6 +2,13 @@
 0 Free build palette
 0 Name: palette.ldr
 0 !LDRAW_ORG Model
+0 // Repacked for the web. Every part file this model references is inlined
+0 // below and its name normalised to the key LDrawLoader looks it up by. No
+0 // geometry is altered and no header is dropped: each block below keeps the
+0 // Author and !LICENSE lines it shipped with.
+0 // Parts are from the LDraw Parts Library, https://library.ldraw.org/, under
+0 // CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) and CC BY 4.0
+0 // (https://creativecommons.org/licenses/by/4.0/), per block.
 1 16 0 0 0 1 0 0 0 1 0 0 0 1 3005.dat
 1 16 200 0 0 1 0 0 0 1 0 0 0 1 14716.dat
 1 16 400 0 0 1 0 0 0 1 0 0 0 1 3004.dat

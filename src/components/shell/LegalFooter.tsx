@@ -1,7 +1,22 @@
 /**
- * Required attribution. LEGO's Fair Play guidelines specify this wording, and
- * the LDraw parts library is CC BY 2.0, which requires crediting it. Present on
- * every route, which is why it lives in the root layout.
+ * Required attribution. LEGO's Fair Play guidelines specify the trademark
+ * wording, and the LDraw Parts Library is CC BY, which specifies the rest.
+ *
+ * CAreadme.txt in the library asks for five things: name the creator, link the
+ * work, name the licence, link the licence, and say whether it was modified.
+ * The first four are here; the fifth is here too, because a packed model inlines
+ * the part files it uses, which LDraw's own rule on derivative works counts as a
+ * modification of the library rather than a mere reference to it.
+ *
+ * Both licence versions are named because both ship. Parts touched since
+ * 2023-03-05 carry CC BY 4.0, older ones CC BY 2.0 or both, and the OMR models
+ * carry CCAL 2.0, which CAreadme.txt defines as a deprecated spelling of CC BY
+ * 2.0. Naming only one of them would credit the wrong licence for most of the
+ * geometry on screen.
+ *
+ * Each route renders this itself: the gallery and the two stages, full on the
+ * gallery and compact over a canvas. It is not in the root layout, so a new
+ * route has to opt in.
  */
 export function LegalFooter({ compact = false }: { compact?: boolean }) {
   if (compact) {
@@ -17,7 +32,25 @@ export function LegalFooter({ compact = false }: { compact?: boolean }) {
         >
           LDraw.org
         </a>{" "}
-        under CC BY 2.0.
+        under{" "}
+        <a
+          className="underline decoration-edge-bright underline-offset-2 hover:text-muted"
+          href="https://creativecommons.org/licenses/by/2.0/"
+          rel="noreferrer noopener"
+          target="_blank"
+        >
+          CC BY 2.0
+        </a>{" "}
+        and{" "}
+        <a
+          className="underline decoration-edge-bright underline-offset-2 hover:text-muted"
+          href="https://creativecommons.org/licenses/by/4.0/"
+          rel="noreferrer noopener"
+          target="_blank"
+        >
+          CC BY 4.0
+        </a>
+        , repacked.
       </p>
     );
   }
@@ -32,8 +65,16 @@ export function LegalFooter({ compact = false }: { compact?: boolean }) {
         </p>
         <p className="max-w-3xl text-muted text-sm leading-relaxed">
           LDraw&trade; is a trademark owned and licensed by the Estate of James
-          Jessiman. Part geometry and colour definitions come from the LDraw
-          Parts Library, used under{" "}
+          Jessiman. Part geometry and colour definitions come from the{" "}
+          <a
+            className="text-ink underline decoration-edge-bright underline-offset-2 hover:decoration-accent-fg"
+            href="https://library.ldraw.org/"
+            rel="noreferrer noopener"
+            target="_blank"
+          >
+            LDraw Parts Library
+          </a>
+          , used under{" "}
           <a
             className="text-ink underline decoration-edge-bright underline-offset-2 hover:decoration-accent-fg"
             href="https://creativecommons.org/licenses/by/2.0/"
@@ -41,8 +82,31 @@ export function LegalFooter({ compact = false }: { compact?: boolean }) {
             target="_blank"
           >
             CC BY 2.0
+          </a>{" "}
+          and{" "}
+          <a
+            className="text-ink underline decoration-edge-bright underline-offset-2 hover:decoration-accent-fg"
+            href="https://creativecommons.org/licenses/by/4.0/"
+            rel="noreferrer noopener"
+            target="_blank"
+          >
+            CC BY 4.0
           </a>
-          .
+          , depending on the part.
+        </p>
+        <p className="max-w-3xl text-muted text-sm leading-relaxed">
+          Modified: every model here is repacked into one file, with the part
+          files it references inlined and their names normalised. No geometry is
+          altered. Official sets come from the{" "}
+          <a
+            className="text-ink underline decoration-edge-bright underline-offset-2 hover:decoration-accent-fg"
+            href="https://library.ldraw.org/omr/sets"
+            rel="noreferrer noopener"
+            target="_blank"
+          >
+            Official Model Repository
+          </a>{" "}
+          and are credited to the author who built them.
         </p>
         <div className="readout mt-2 flex flex-wrap gap-x-6 gap-y-2 text-faint">
           <a

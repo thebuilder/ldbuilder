@@ -128,6 +128,7 @@ export function makeBrick(id: number, spec: BrickSpec = {}): Brick {
 
 export interface ModelSpec {
   bricks: BrickSpec[];
+  credit?: string | null;
   slug?: string;
   subassemblies?: Subassembly[];
   title?: string;
@@ -165,6 +166,7 @@ export function makeModel(spec: ModelSpec): ModelData {
     bom: [],
     bounds,
     bricks,
+    credit: spec.credit ?? null,
     expectedBricks: bricks.length,
     root,
     slug: spec.slug ?? "test-model",

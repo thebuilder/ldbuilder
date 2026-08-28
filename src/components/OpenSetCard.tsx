@@ -102,13 +102,19 @@ export function OpenSetCard({
           return;
         }
 
-        const slug = `local-omr-${data.setId ?? set}`;
+        const setId = data.setId ?? set;
+        const slug = `local-omr-${setId}`;
         putUpload({
+          // OMR sets are CC BY through the CCAL header the route checked for, so
+          // the author travels with the model and the viewer shows it.
+          credit: data.author
+            ? `${data.author}, LDraw OMR (CC BY 2.0)`
+            : "LDraw OMR (CC BY 2.0)",
           missingParts: data.missing ?? [],
           partNames: data.partNames ?? {},
           slug,
           text: data.mpd,
-          title: `${data.setId ?? set}${data.author ? ` by ${data.author}` : ""}`,
+          title: setId,
         });
         router.push(`/build/${slug}`);
       } catch {
