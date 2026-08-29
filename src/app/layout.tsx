@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
@@ -55,6 +56,10 @@ export default function RootLayout({
         >
           <NuqsAdapter>{children}</NuqsAdapter>
         </ThemeProvider>
+        {/* Off in dev: the debug build of the script is fetched from an
+            external CDN and logs every pageview to the console, neither of
+            which is worth it when no data is being recorded anyway. */}
+        {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>
   );
