@@ -1,7 +1,6 @@
 export const clamp01 = (value: number): number =>
   Math.min(Math.max(value, 0), 1);
 
-/** Classic four-segment bounce, used so poured bricks land rather than glide. */
 export function easeOutBounce(t: number): number {
   const n = 7.5625;
   const d = 2.75;
@@ -20,21 +19,12 @@ export function easeOutBounce(t: number): number {
   return n * u * u + 0.984_375;
 }
 
-/**
- * A small overshoot before settling. A flat ease puts the brick exactly where
- * it belongs and stops; the overshoot pushes past by a few percent and comes
- * back, which is what pressing a brick down actually looks like.
- */
 export function easeOutBackSoft(t: number): number {
   const c = 1.15;
   const u = t - 1;
   return 1 + (c + 1) * u ** 3 + c * u ** 2;
 }
 
-/**
- * Spread `count` items across a 0-1 timeline so they animate in sequence but
- * overlap. `window` is the fraction of the timeline each item gets.
- */
 export function staggered(
   t: number,
   index: number,
@@ -48,20 +38,14 @@ export function staggered(
   return clamp01((t - start) / window);
 }
 
-/**
- * Rescale the slice of a 0-1 timeline between `from` and `to` back onto 0-1,
- * so two things can take turns inside one progress value.
- */
 export function phase(t: number, from: number, to: number): number {
   return clamp01((t - from) / (to - from));
 }
 
-/** Ease in and out, for a move that starts and ends at rest. */
 export function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
 }
 
-/** Smooth follow that is frame-rate independent, unlike a raw lerp per frame. */
 export function damp(
   current: number,
   target: number,

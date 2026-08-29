@@ -1,34 +1,9 @@
-// Resolve LDraw parts over the network, for hosts with no local parts library.
-//
-// The library is 36,600 files and 612MB unpacked, 145MB zipped. That is too big
-// to commit and too big for a serverless bundle, so a deployment cannot carry
-// it. But a model only touches a few hundred parts, so they can be fetched.
-//
-// Two sources, in order:
-//
-//   1. A jsDelivr-hosted mirror of the library. This is the fast path: a CDN
-//      with no rate limit, measured at ~380 req/s once an edge is warm.
-//   2. library.ldraw.org itself, which is authoritative and current but rate
-//      limits hard. Measured: ~20 req/s, and 4-way concurrency already returns
-//      429 for most requests.
-//
-// The mirror is a snapshot, so parts added to the library after it was taken are
-// only in the second source. Going to the mirror first means the slow, limited
-// origin is asked for a handful of recent parts rather than all several hundred,
-// which keeps a cold set to a few seconds without hammering anyone.
-
-/**
- * Snapshot of the official library laid out exactly as LDrawLoader expects,
- * published for static hosting by a three.js maintainer.
- */
 const MIRROR =
   "https://cdn.jsdelivr.net/gh/gkjohnson/ldraw-parts-library@master/complete/ldraw";
 
-/** The library itself. Current, authoritative, and rate limited. */
 const ORIGIN = "https://library.ldraw.org/library/official";
 const ORIGIN_UNOFFICIAL = "https://library.ldraw.org/library/unofficial";
 
-/** Directories searched, in the order LDrawLoader itself searches them. */
 const SEARCH_DIRS = ["parts", "p", "models"];
 
 /**
@@ -60,14 +35,6 @@ function candidatePaths(name) {
   ];
 }
 
-/**
- * How many lookups to run at once against this resolver.
- *
- * Sized for the mirror, which is a CDN and does not mind. The origin is only
- * reached for parts the mirror lacks, few enough that this rarely trips its
- * limiter; the retry below covers the times it does. Most of a cold set's time
- * goes on round trips rather than bandwidth, so this is the main lever there.
- */
 export const REMOTE_CONCURRENCY = 48;
 
 /** One retry per rate-limited request, after a pause. */
@@ -93,7 +60,6 @@ const sleep = (ms) =>
 export function networkResolver({ cache = new Map(), fetchImpl = fetch } = {}) {
   const inFlight = new Map();
 
-  /** One request. A network blip is a miss; the caller tries the next candidate. */
   const attempt = async (url) => {
     try {
       return await fetchImpl(url);
@@ -102,7 +68,6 @@ export function networkResolver({ cache = new Map(), fetchImpl = fetch } = {}) {
     }
   };
 
-  /** A missing, failed or errored response all mean the same thing here. */
   const read = async (response) =>
     response?.ok ? await response.text() : null;
 

@@ -1,11 +1,3 @@
-// Packs an LDraw model plus every part it references into a single .mpd file.
-//
-// Why this exists: a .ldr is just a list of transforms pointing at part files in
-// the 20k-file official library. Serving that library over HTTP means hundreds of
-// requests per model, most of them 404s, because LDrawLoader resolves parts by
-// trying parts/ then p/ then models/ in turn. Packing collapses a model to one
-// request and removes the library from the runtime entirely.
-//
 // The subtle part is naming. LDrawLoader normalizes every reference before it
 // looks it up (LDrawLoader.js, LDrawParsedCache.parse / fetchData):
 //
@@ -23,17 +15,14 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-/** Directories searched, in the order LDrawLoader itself searches them. */
 const SEARCH_DIRS = ["parts", "p", "models"];
 
-/** A type-1 line is: 1 <colour> x y z a b c d e f g h i <file> */
 const REF_LINE = /^1\s+\S+(?:\s+\S+){12}\s+(.+)$/;
 const LINE_BREAK = /\r\n|\r|\n/;
 const FILE_DIRECTIVE = /^0\s+FILE\s+(.+)$/i;
 const TEXMAP_DIRECTIVE = /^0\s+!TEXMAP/i;
 const LIBRARY_EXTENSION = /\.(dat|ldr|mpd)$/i;
 const MOVED_TO = /^~Moved to\s+(\S+)/i;
-/** Leading ~, = or _ mark a part as an alias or otherwise not a real part. */
 const ALIAS_MARKERS = /^[~=_]+/;
 
 /**
@@ -142,16 +131,8 @@ function resolveAliasNames(partNames) {
   }
 }
 
-/**
- * How many lookups run at once by default.
- *
- * Reading local files is fast enough that this barely matters. It matters a lot
- * over the network, where a set is roughly 400 lookups, so the API routes pass
- * a higher number sized for the CDN they resolve against.
- */
 const RESOLVE_CONCURRENCY = 24;
 
-/** Map with bounded concurrency, preserving input order in the result. */
 async function mapConcurrent(items, limit, fn) {
   const results = new Array(items.length);
   let cursor = 0;
@@ -170,7 +151,6 @@ async function mapConcurrent(items, limit, fn) {
   return results;
 }
 
-/** Resolve against a parts library on disk. Used by the CLI and in dev. */
 export function localResolver(index) {
   return async (key) => {
     const diskPath = index.get(key);
@@ -178,7 +158,6 @@ export function localResolver(index) {
   };
 }
 
-/** First plain `0 ...` line of a part file is its human description. */
 function descriptionOf(text) {
   for (const line of splitLines(text)) {
     const t = line.trim();
@@ -194,7 +173,6 @@ function descriptionOf(text) {
   return null;
 }
 
-/** Split an .mpd into its `0 FILE <name>` blocks, preserving order. */
 function extractEmbedded(text) {
   const blocks = new Map();
   let current = null;
@@ -219,7 +197,6 @@ function extractEmbedded(text) {
   return blocks;
 }
 
-/** Every part reference in a file body, normalized. */
 function refsIn(body) {
   const refs = [];
   const texmaps = [];
@@ -256,7 +233,6 @@ function takeBatch(queue, scanned, bodies) {
   return batch;
 }
 
-/** Keep one resolved file, and queue whatever it references in turn. */
 function recordFile(key, body, state) {
   state.bodies.set(key, body);
 
@@ -272,10 +248,6 @@ function recordFile(key, body, state) {
   state.queue.push(...refs);
 }
 
-/**
- * Record one round's results. A reference that came back empty is noted as
- * missing and not retried.
- */
 function absorbRound(batch, resolved, state) {
   for (const [i, body] of resolved.entries()) {
     const { key, ref } = batch[i];
@@ -287,16 +259,6 @@ function absorbRound(batch, resolved, state) {
   }
 }
 
-/**
- * Walk the dependency graph, resolving one breadth-first round at a time.
- *
- * Everything currently queued is resolved concurrently, and what comes back is
- * scanned for the next round. Resolving one reference at a time is fine against
- * a local directory and hopeless against a network resolver, where a single set
- * is roughly 400 lookups.
- *
- * Mutates `bodies`, `partNames`, `missing` and `texmapFiles` in place.
- */
 async function resolveDependencies(state) {
   const { bodies, concurrency, queue, resolve, scanned } = state;
   while (queue.length > 0) {
@@ -497,7 +459,6 @@ export async function packModel({
     stats: {
       bytes: mpd.length,
       files: bodies.size + 1,
-      /** Reference lines dropped because their part could not be resolved. */
       skipped,
       texmapFiles: [...texmapFiles],
     },

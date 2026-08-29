@@ -13,7 +13,6 @@
 
 const LIST_URL = "https://library.ldraw.org/omr/sets";
 
-/** Identify the scraper, so the maintainers can see who is asking. */
 const USER_AGENT =
   "ldbuilder set-index builder (+https://github.com/thebuilder/ldbuilder)";
 
@@ -35,7 +34,6 @@ const ENTITIES = {
 };
 const ENTITY = /&(?:#0?39|amp|gt|lt|nbsp|quot);/g;
 
-/** Strip tags and collapse whitespace, leaving the cell's visible text. */
 function cellText(html) {
   return html
     .replace(TAG, "")
@@ -82,7 +80,6 @@ export function parsePage(doc) {
   return sets;
 }
 
-/** How many sets the list says it has, so the caller can check it got them all. */
 export function parseTotal(doc) {
   const match = TOTAL.exec(doc);
   return match ? Number(match[1].replaceAll(",", "")) : null;

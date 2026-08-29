@@ -1,23 +1,9 @@
 #!/usr/bin/env node
-// Build the searchable set index the gallery's set field uses.
-//
-//   pnpm ldraw:index
-//
-// Writes public/omr-index.json, which is committed. Re-run it when the OMR has
-// gained sets worth finding by name; typing a full set number works regardless.
-
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fetchIndex } from "./lib/omr-index.mjs";
 import { PUBLIC_DIR } from "./lib/paths.mjs";
 
-/**
- * Rows are tuples, not objects.
- *
- * This file ships to the browser. Over 1,470 sets, repeating four key names per
- * entry costs about 40KB of pure punctuation, so the shape is documented here
- * and in src/lib/omrIndex.ts instead of in every row.
- */
 const COLUMNS = ["setId", "name", "theme", "year"];
 const toRow = ({ setId, name, theme, year }) => [setId, name, theme, year];
 

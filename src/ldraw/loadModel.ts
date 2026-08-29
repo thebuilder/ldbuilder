@@ -28,7 +28,6 @@ const MPD_EXTENSION = /\.mpd$/i;
  */
 const SMOOTH_NORMALS_MAX_BRICKS = 200;
 
-/** Cheap upper bound on brick count: every part reference is a type-1 line. */
 function countReferences(text: string): number {
   let count = 0;
   let index = text.indexOf("\n1 ");
@@ -111,9 +110,6 @@ export async function loadModel(options: LoadModelOptions): Promise<ModelData> {
 
   timer.mark("fetch");
 
-  // The manifest knows the exact count; an upload has to be estimated from the
-  // file, which over-counts (submodel references are type-1 lines too) and so
-  // errs towards the fast path.
   const estimatedBricks = expectedBricks ?? countReferences(source);
   const smoothNormals = estimatedBricks <= SMOOTH_NORMALS_MAX_BRICKS;
   loader.smoothNormals = smoothNormals;
@@ -133,8 +129,6 @@ export async function loadModel(options: LoadModelOptions): Promise<ModelData> {
     flattenModel(raw, partNames);
 
   if (expectedBricks !== null && bricks.length !== expectedBricks) {
-    // Not fatal, but it means the runtime brick predicate and the packer's
-    // disagree, and a disagreement there loses bricks without saying so.
     console.warn(
       `[ldraw] ${slug}: flattened ${bricks.length} bricks but the manifest expects ${expectedBricks}`
     );

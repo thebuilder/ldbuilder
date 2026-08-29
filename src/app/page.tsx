@@ -14,11 +14,6 @@ export default async function GalleryPage() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/*
-        The header is the model: the canvas sits behind the type, building the
-        set the gallery below is full of. It is the claim and the demonstration
-        in the same rectangle, which is why the text over it can be two lines.
-      */}
       <header className="relative overflow-hidden border-edge border-b">
         {hero ? (
           <HeroBuild slug={hero.slug} title={hero.title} url={hero.url} />
@@ -37,12 +32,7 @@ export default async function GalleryPage() {
             <ThemeToggle />
           </div>
 
-          {/* Held clear of the right-hand third so the model has somewhere to
-              stand, and so the drag that turns it lands on the canvas. */}
           <div className="mt-16 mb-52 max-w-2xl lg:mt-28 lg:mb-28">
-            {/* Broken by hand rather than left to wrap: the two halves are a
-                promise and its answer, and the second is a shade back so the
-                first is what the eye lands on. */}
             <p className="font-semibold text-4xl text-ink leading-[1.04] tracking-tight sm:text-5xl lg:text-6xl">
               Watch it build itself.
               <span className="block text-muted">Then build it yourself.</span>
@@ -57,9 +47,6 @@ export default async function GalleryPage() {
             Start a build
           </h2>
 
-          {/* Search first and largest: it reaches every official set, where
-              everything below it reaches one. Free build sits beside it because
-              it is the same decision made the other way. */}
           <div className="grid gap-px lg:grid-cols-5">
             <OpenSetCard className="lg:col-span-3" featured />
             <FreeBuildCard className="lg:col-span-2" />
@@ -143,14 +130,6 @@ export default async function GalleryPage() {
  */
 const HERO_MAX_BRICKS = 200;
 
-/**
- * Which bundled model builds itself behind the header.
- *
- * The car by name, because it is the canonical LDraw demo and it reads as a
- * thing rather than as a shape; otherwise the largest model this deployment
- * packed that is still cheap enough to put on a page nobody has committed to.
- * A checkout with nothing packed gets a header with no model in it.
- */
 function pickHeroModel(
   models: ModelMeta[]
 ): { slug: string; title: string; url: string } | null {

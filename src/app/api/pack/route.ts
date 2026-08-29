@@ -7,7 +7,6 @@ import { compressedJson } from "../../../server/compressed-json";
 import { getResolver } from "../../../server/parts-resolver";
 
 export const runtime = "nodejs";
-/** An uploaded model is never cached, so it always pays full resolution cost. */
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 

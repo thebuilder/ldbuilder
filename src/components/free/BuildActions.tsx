@@ -11,7 +11,6 @@ export interface BuildActionsProps {
   placed: number;
 }
 
-/** Counts, and the three things you do to a build as a whole. */
 export function BuildActions({ controller, placed, loose }: BuildActionsProps) {
   const [confirming, setConfirming] = useState(false);
 

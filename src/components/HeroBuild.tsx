@@ -12,13 +12,6 @@ import type { HeroScene } from "@/scene/HeroScene";
  * to get painted, and the loop is parked the moment the header scrolls away.
  */
 
-/**
- * Where the model sits in the frame.
- *
- * Wide enough and it stands to the right of the type. Narrow, and there is no
- * beside: it drops into the band the header keeps clear underneath instead,
- * which is the only arrangement where a phone gets both the words and the car.
- */
 const WIDE_BIAS = { x: 0.72, y: 0.5 };
 const NARROW_BIAS = { x: 0.5, y: 0.74 };
 
@@ -61,8 +54,6 @@ export function HeroBuild({
       scene?.setBias(bias.x, bias.y);
       scene?.resize(width, height);
     });
-    // A hero that keeps rendering after it has been scrolled past is a battery
-    // bill for something nobody is looking at.
     const visible = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) {
         scene?.start();

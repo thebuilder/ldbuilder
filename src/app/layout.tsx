@@ -22,7 +22,6 @@ export const metadata: Metadata = {
   description:
     "Load an LDraw model, tip the bricks onto the floor, and watch it assemble itself step by step. Explode, slice and inspect any piece.",
   metadataBase: siteUrl(),
-  // Both the twitter and openGraph cards pick up app/opengraph-image.tsx.
   openGraph: {
     description:
       "Tip the bricks onto the floor and watch a model assemble itself, one build step at a time.",

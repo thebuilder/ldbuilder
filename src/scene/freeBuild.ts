@@ -20,30 +20,22 @@ import {
  * themselves off-grid, which are the same parts a person places by eye anyway.
  */
 
-/** LDraw units between two studs. */
 export const STUD = 20;
-/** Height of one plate. A brick is three of them. */
 export const PLATE = 8;
 
-/** Overlaps under this are two parts touching, not two parts colliding. */
 const TOUCH_EPSILON = 0.5;
 
 const X_AXIS = new Vector3(1, 0, 0);
 const Y_AXIS = new Vector3(0, 1, 0);
 
-/** The turn `flattenModel` bakes in so the rest of the app can assume Y is up. */
 const LDRAW_TO_YUP = new Matrix4().makeRotationX(Math.PI);
 
 export interface Placement {
   colorCode: number;
-  /** `3001.dat`. */
   file: string;
   id: number;
-  /** The part's own origin, in the same space the models are built in. */
   position: Vector3;
-  /** Quarter turns about X, applied before the yaw. Tips a part on its side. */
   tip: number;
-  /** Quarter turns about Y. */
   yaw: number;
 }
 
@@ -114,32 +106,23 @@ export function snapCenterToGrid(center: number, extent: number): number {
 }
 
 export interface SnapResult {
-  /** True when the part would pass through something already built. */
   blocked: boolean;
-  /** The placement this would become. */
   position: Vector3;
-  /** The part it is resting on, so the UI can point at it. Null on the floor. */
   restingOn: number | null;
 }
 
 export interface SnapInput {
-  /** Everything already built, by placement id. */
   built: Map<number, Standing>;
   center: Vector3;
-  /** Where the pointer is asking for the part to be, before snapping. */
   desired: Vector3;
   floorY: number;
   half: Vector3;
-  /** Lattice steps the person has nudged it by, after snapping. */
   nudge: { x: number; y: number; z: number };
-  /** The carried part, measured into columns at its current orientation. */
   profile: Profile;
 }
 
 interface Level {
-  /** The placement being rested on, or null for the floor. */
   on: number | null;
-  /** Where the part's origin would sit. */
   y: number;
 }
 
@@ -163,24 +146,14 @@ export function snapPlacement(input: SnapInput, target: Vector3): SnapResult {
     nudge.z * STUD -
     center.z;
 
-  // The footprint is known before the height is, which is what lets the height
-  // be read off whatever that footprint covers.
   const lowest = lowestOf(profile);
   const levels = levelsUnder(profile, x, z, built, floorY - lowest);
 
-  // Nearest to where the pointer actually is, rather than the highest, and
-  // measured at the part's underside so it is the face somebody is pointing at.
-  // Pointing at the top of a brick halfway up a stack means that brick, not the
-  // top of the stack: it is the difference between building on something and
-  // only ever building upward.
   levels.sort(
     (a, b) =>
       Math.abs(a.y + lowest - desired.y) - Math.abs(b.y + lowest - desired.y)
   );
 
-  // A height set by hand is a decision, so it is placed where it was asked for
-  // and reported as not fitting if it does not. Otherwise take the nearest
-  // level the part actually fits at.
   const search = nudge.y === 0 ? levels : levels.slice(0, 1);
   const [nearest] = levels;
   let chosen = nearest;
@@ -257,11 +230,7 @@ export function toLdrawFile(placements: Placement[], title: string): string {
   const quaternion = new Quaternion();
   const scale = new Vector3(1, 1, 1);
 
-  // No Author and no !LICENSE line, deliberately. A free build is the person's
-  // own model, so this app is not its author and has no business licensing it on
-  // their behalf; both lines are theirs to add. Nor does it owe the parts library
-  // an attribution: the file references parts by name and includes no part source,
-  // which is the case CAreadme.txt names as not a derivative work.
+  // The user owns this model; add no author or license on their behalf.
   const lines = [
     `0 ${title}`,
     "0 Name: untitled.ldr",
@@ -275,7 +244,6 @@ export function toLdrawFile(placements: Placement[], title: string): string {
     matrix.premultiply(LDRAW_TO_YUP);
 
     const e = matrix.elements;
-    // three stores column-major; LDraw writes the rotation out by rows.
     const numbers = [
       e[12],
       e[13],
@@ -300,7 +268,6 @@ export function toLdrawFile(placements: Placement[], title: string): string {
   return lines.join("\n");
 }
 
-/** Trim floating-point noise: every value here is a grid step or a 0, 1 or -1. */
 function round(value: number): number {
   const rounded = Math.round(value * 1000) / 1000;
   return Object.is(rounded, -0) ? 0 : rounded;

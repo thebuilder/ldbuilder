@@ -46,13 +46,6 @@ function StatusNote({ status }: { status: Status }) {
   );
 }
 
-/**
- * A few sets to press rather than type.
- *
- * An empty search field is a question with 1,470 answers, and someone who has
- * never opened an LDraw file has no reason to know that "10220" is one of them.
- * These are small enough to pack quickly and famous enough to be worth a click.
- */
 const SUGGESTIONS: readonly { label: string; setId: string }[] = [
   { label: "Camper Van", setId: "10220-1" },
   { label: "Opera House", setId: "21012-1" },
@@ -73,7 +66,6 @@ export function OpenSetCard({
   featured = false,
 }: {
   className?: string;
-  /** The front page's headline way in, given the room to look like one. */
   featured?: boolean;
 }) {
   const router = useRouter();

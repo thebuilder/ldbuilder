@@ -6,7 +6,6 @@ import type { PaletteGroup, PalettePart } from "@/ldraw/palette";
 import { ColorPicker } from "./ColorPicker";
 import { StudIcon } from "./StudIcon";
 
-/** Footprints worth filtering by; past this a part is "big" and you scroll. */
 const STUD_FILTERS = [1, 2, 3, 4, 6, 8];
 
 export interface PartsInventoryProps {
@@ -23,18 +22,9 @@ export interface PartsInventoryProps {
 
 const POUR_COUNTS = [1, 5, 10, 25];
 
-/** Group labels are two or three words; the tab has room for the first. */
 const FIRST_WORD = /[ ,&]/;
 const DAT_SUFFIX = /\.dat$/i;
 
-/**
- * The box of parts.
- *
- * Two ways out of it, because there are two things people mean by "I want that
- * brick". **Take** puts one on the pointer to place straight away, which is how
- * you build. **Tip out** drops a handful on the floor as a physical pile, which
- * is how you get a working supply of the part you are about to use fifty of.
- */
 export function PartsInventory({
   groups,
   colorCode,

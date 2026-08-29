@@ -1,12 +1,5 @@
 #!/usr/bin/env node
 
-// Downloads the official LDraw parts library and extracts it to ./ldraw-library.
-//
-// The library is ~138MB zipped and expands to ~20k files, so it is gitignored.
-// It is only needed to *pack* models (see pack-models.mjs) and to serve the
-// /api/pack route. The committed .mpd files in public/models are self-contained,
-// so running the app never requires this.
-
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { copyFile, mkdir, rm, stat } from "node:fs/promises";
@@ -66,8 +59,6 @@ async function download() {
 }
 
 function unzip() {
-  // `unzip` ships with macOS and every mainstream Linux image, and handles a
-  // 20k-entry archive far faster than a JS implementation.
   return new Promise((resolve, reject) => {
     const proc = spawn(
       "unzip",

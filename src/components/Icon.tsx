@@ -13,7 +13,6 @@ interface IconProps {
 
 interface GlyphProps extends IconProps {
   children: React.ReactNode;
-  /** Filled glyphs (play, pause) draw with fill rather than stroke. */
   filled?: boolean;
 }
 
@@ -147,7 +146,6 @@ export function Close({ className = "h-3.5 w-3.5" }: IconProps) {
   );
 }
 
-/** Build mode: a brick being set down. */
 export function Brick({ className = "h-3.5 w-3.5" }: IconProps) {
   return (
     <Glyph className={className}>
@@ -157,7 +155,6 @@ export function Brick({ className = "h-3.5 w-3.5" }: IconProps) {
   );
 }
 
-/** Watch mode: the model playing itself out. */
 export function Eye({ className = "h-3.5 w-3.5" }: IconProps) {
   return (
     <Glyph className={className}>
@@ -167,7 +164,6 @@ export function Eye({ className = "h-3.5 w-3.5" }: IconProps) {
   );
 }
 
-/** Highlight the pieces this step still needs. */
 export function Target({ className = "h-3.5 w-3.5" }: IconProps) {
   return (
     <Glyph className={className}>
@@ -177,7 +173,6 @@ export function Target({ className = "h-3.5 w-3.5" }: IconProps) {
   );
 }
 
-/** Start the build again from the first step. */
 export function Restart({ className = "h-3.5 w-3.5" }: IconProps) {
   return (
     <Glyph className={className}>
@@ -187,7 +182,6 @@ export function Restart({ className = "h-3.5 w-3.5" }: IconProps) {
   );
 }
 
-/** Progress written to disk. */
 export function Save({ className = "h-3.5 w-3.5" }: IconProps) {
   return (
     <Glyph className={className}>
@@ -197,13 +191,6 @@ export function Save({ className = "h-3.5 w-3.5" }: IconProps) {
   );
 }
 
-/**
- * A spinner for waits with no measurable progress.
- *
- * Drawn as a ring with a gap rather than a partial arc plus a full circle, so
- * the thing that turns is the only thing on screen and there is nothing behind
- * it to alias against at 14px.
- */
 export function Spinner({ className = "h-3.5 w-3.5" }: IconProps) {
   return (
     <Glyph className={className}>

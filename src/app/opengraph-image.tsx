@@ -5,10 +5,6 @@ export const alt =
 export const size = { height: 630, width: 1200 };
 export const contentType = "image/png";
 
-/**
- * Rendered once at build time by next/og. Kept to layout primitives and system
- * fonts so it needs no font fetch and no external asset.
- */
 export default function OpenGraphImage() {
   const brick = (color: string, x: number, y: number, w: number, h: number) => (
     <div
@@ -39,7 +35,6 @@ export default function OpenGraphImage() {
         width: "100%",
       }}
     >
-      {/* Loose bricks, echoing the floor the models are tipped onto. */}
       {brick("#1c6bd6", 820, 96, 132, 44)}
       {brick("#e3000b", 980, 168, 88, 44)}
       {brick("#8d95a2", 792, 214, 108, 36)}
@@ -57,12 +52,6 @@ export default function OpenGraphImage() {
         </div>
       </div>
 
-      {/*
-        The page's own heading, at the page's own weights. A card that is read
-        in a second in a feed cannot carry the paragraph and the feature list
-        that used to be here as well, and the four words below say what it is
-        for anyone the heading leaves guessing.
-      */}
       <div style={{ display: "flex", flexDirection: "column", maxWidth: 760 }}>
         <div style={{ fontSize: 68, letterSpacing: -1, lineHeight: 1.1 }}>
           Watch it build itself.

@@ -25,7 +25,6 @@ const KEYS: Key[] = [
   { keys: "Del", what: "Throw away" },
 ];
 
-/** What is in hand, and the keys that move it. */
 export function CarryHud({ carrying, placed, loose }: CarryHudProps) {
   const group = (carrying?.count ?? 1) > 1;
   return (

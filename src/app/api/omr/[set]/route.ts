@@ -26,7 +26,6 @@ const NOT_IN_OMR = /not in the OMR/;
  */
 const IMMUTABLE = "public, s-maxage=31536000, max-age=3600, immutable";
 
-/** What `readMetadata` in scripts/lib/omr.mjs returns. */
 interface OmrMetadata {
   author: string | null;
   keywords: string | null;

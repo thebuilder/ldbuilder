@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-// Generates src/ldraw/colors.generated.ts from the library's LDConfig.ldr.
-//
-// LDrawLoader reads LDConfig at runtime for materials, but the UI also needs
-// human colour names ("Bright Light Orange", not "code 191") and swatch hexes
-// for the parts bin and inspector. Rather than parse LDConfig twice in the
-// browser, we bake the table in at setup time.
-
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PUBLIC_LDRAW_DIR, SRC_DIR } from "./lib/paths.mjs";
@@ -18,7 +11,6 @@ const COLOUR_DIRECTIVE = /^0\s+!COLOUR/i;
 const WHITESPACE = /\s+/;
 const LINE_BREAK = /\r\n|\r|\n/;
 
-/** `0 !COLOUR <name> CODE <n> VALUE <#rgb> EDGE <#rgb> [ALPHA <n>] [CHROME|METAL|PEARLESCENT|RUBBER|MATTE_METALLIC]` */
 function parseColour(line) {
   const body = line.replace(COLOUR_PREFIX, "").trim();
   const tokens = body.split(WHITESPACE);

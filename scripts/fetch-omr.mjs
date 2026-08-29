@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// Download sets from the LDraw Official Model Repository into the cache.
-//
-//   pnpm ldraw:omr 928 21309
-//
-// Packing them into the gallery is `pnpm ldraw:pack`; add the set to CURATED in
-// scripts/pack-models.mjs first. This command exists to check a set is present
-// and see who built it before committing to shipping it.
-
 import { fetchSet } from "./lib/omr.mjs";
 
 async function main() {
