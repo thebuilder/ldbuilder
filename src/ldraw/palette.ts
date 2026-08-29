@@ -52,7 +52,6 @@ const INHERITED_EDGE = "24";
 const SMOOTH_NORMALS = false;
 
 export interface PalettePart {
-  /** `3001.dat`. */
   file: string;
   group: string;
   /** The whole part, studs included. This is the shape physics collides on. */
@@ -61,7 +60,6 @@ export interface PalettePart {
   meshes: Mesh[];
   name: string;
   radius: number;
-  /** Size in studs as the part's own description states it, for filtering. */
   size: number[];
   /**
    * The part without its studs: the shape another part rests on.
@@ -73,7 +71,6 @@ export interface PalettePart {
    */
   solidCenter: Vector3;
   solidHalfExtents: Vector3;
-  /** Prototype, detached and never posed. Instances are clones of this. */
   template: Object3D;
 }
 
@@ -134,8 +131,6 @@ export async function loadPalette(): Promise<Palette> {
   const source = await mpdResponse.text();
   timer.mark("fetch");
 
-  // The parse cannot be split, so the last chance the loading card gets to
-  // paint is here, before it.
   await yieldToBrowser();
 
   const raw = await new Promise<Group>((resolve, reject) => {
@@ -143,8 +138,6 @@ export async function loadPalette(): Promise<Palette> {
   });
   timer.mark("parse");
 
-  // The palette is one model whose every reference is a part, so flattening it
-  // hands back exactly one brick per palette entry, already measured.
   const { bricks } = flattenModel(raw, {});
   timer.mark("flatten");
   const byFile = new Map<string, PalettePart>();
@@ -164,8 +157,6 @@ export async function loadPalette(): Promise<Palette> {
       localCenter: brick.localCenter,
       meshes: brick.meshes,
       name: brick.partName,
-      // A part is turned in ninety-degree steps, so its bounding sphere is the
-      // only radius that stays true whichever way up it ends.
       radius: brick.halfExtents.length(),
       size: [],
       solidCenter: solid.center,
@@ -225,8 +216,6 @@ function solidBox(
   const top = localCenter.y + halfExtents.y;
   return {
     center: new Vector3(localCenter.x, (bottom + top) / 2, localCenter.z),
-    // A part that is all stud and no body keeps a sliver, so nothing ends up
-    // with a zero-height surface to rest on.
     half: new Vector3(
       halfExtents.x,
       Math.max((top - bottom) / 2, 0.5),
@@ -268,10 +257,8 @@ export function instantiate(
       child.material = recolour(child.material, surface, edge);
       return;
     }
-    // Only meshes are pickable; edge lines opt out so the raycast never has to
-    // filter them.
     child.raycast = () => {
-      // Deliberately empty.
+      // Only meshes are pickable.
     };
     // Edge lines carry a material too, and it is the one that says what colour
     // an outline is. `LineSegments` is not a `Mesh`, but the field is the same.

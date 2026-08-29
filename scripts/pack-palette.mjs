@@ -1,18 +1,5 @@
 #!/usr/bin/env node
 
-// Packs the free-build palette: every part the sandbox can hand you, plus all
-// the primitives they are built from, in one self-contained .mpd.
-//
-// This is the same trick pack-models.mjs plays, for the same reason: the parts
-// library is 20k files and cannot be served, so anything the runtime needs has
-// to be inlined ahead of time. The difference is what goes in. A model pack
-// contains the parts that model uses; a palette pack contains the parts a
-// person might reach for, chosen by scripts/lib/palette-select.mjs.
-//
-// The root block references each part once with colour 16, "main colour", so
-// nothing in the pack is committed to a colour. The runtime swaps in whichever
-// colour is picked when a part is taken out of the inventory.
-
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -23,14 +10,11 @@ import {
 import { selectPaletteParts } from "./lib/palette-select.mjs";
 import { LIBRARY_DIR, PUBLIC_PARTS_DIR } from "./lib/paths.mjs";
 
-/** Spacing between parts in the root block, so the raw file is not a heap. */
 const LAYOUT_PITCH = 200;
 const PER_ROW = 16;
 
-/** LDraw colour 16 is "inherit from the parent", which at the top level is nothing. */
 const MAIN_COLOUR = 16;
 
-/** A type-1 reference with an identity rotation at (x, y, z). */
 function reference(file, index) {
   const x = (index % PER_ROW) * LAYOUT_PITCH;
   const z = Math.floor(index / PER_ROW) * LAYOUT_PITCH;

@@ -22,7 +22,6 @@ const SOLID = [
 
 const TRANSLUCENT = [47, 40, 36, 57, 46, 42, 34, 43, 33, 41, 37, 52];
 
-/** Chrome and pearl, which a builder reaches for last but does reach for. */
 const FINISH = [80, 82, 83, 84, 135, 179, 148];
 
 const SECTIONS = [
@@ -31,7 +30,6 @@ const SECTIONS = [
   { codes: FINISH, id: "finish", label: "Metallic" },
 ];
 
-/** The row that shows without asking: what most builds are actually made of. */
 const FAVOURITES = [15, 71, 72, 0, 4, 25, 14, 2, 1, 73, 70, 19];
 
 export interface ColorPickerProps {
@@ -41,13 +39,6 @@ export interface ColorPickerProps {
   selected: number;
 }
 
-/**
- * Colour, in one row until you want more.
- *
- * Fifty swatches is a wall, and it was pushing the part list off the bottom of
- * the panel. The dozen a build is usually made of sit out; the rest are one
- * press away.
- */
 export function ColorPicker({
   selected,
   expanded,

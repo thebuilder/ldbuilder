@@ -35,34 +35,16 @@ import {
 const FIXED_DT = 1 / 60;
 const MAX_SUBSTEPS = 4;
 
-/** Frames between sweeps for bricks thrown somewhere they cannot be reached. */
 const STRAY_CHECK_FRAMES = 30;
 
-/**
- * How far past the middle a brick may travel before it is put back, as a
- * multiple of the release height. The release height is itself derived from how
- * far the pile spreads, so this works out at roughly twice the pile's radius:
- * far enough that a deliberate throw lands, close enough that the brick is
- * still somewhere you can see.
- */
 const STRAY_FACTOR = 1.2;
 
-/**
- * How much of the hand's speed a released brick keeps.
- *
- * A little over one, because the tracked speed is a smoothed average and a
- * flick is over before the average catches up with it: the compensation is for
- * the measurement, not a thumb on the scale.
- */
 const THROW_SCALE = 1.3;
 
-/** Nothing leaves the hand faster than this, in LDraw units per second. */
 const MAX_THROW_SPEED = 4000;
 
-/** A thrown brick tumbles; the faster it goes the more it turns. */
 const THROW_SPIN = 0.012;
 
-/** Smoothing on the tracked hand velocity, per second. */
 const VELOCITY_LAMBDA = 22;
 
 export interface SpawnOptions {
@@ -74,10 +56,8 @@ export interface SpawnOptions {
 
 interface Held {
   brickId: number;
-  /** Where the hand is, which the body is driven to each step. */
   position: Vector3;
   quaternion: Quaternion;
-  /** Smoothed, so a throw uses the swing rather than the last frame's jitter. */
   velocity: Vector3;
 }
 
@@ -92,7 +72,6 @@ export class LiveWorld {
   private frames = 0;
 
   private readonly floorY: number;
-  /** Characteristic length of this model, used for gravity and stray bounds. */
   private readonly unit: number;
   private readonly centre = new Vector3();
 
@@ -125,7 +104,6 @@ export class LiveWorld {
     );
   }
 
-  /** Null when the physics module never loaded, which build mode cannot do without. */
   static create(
     floorY: number,
     unit: number,
@@ -142,7 +120,6 @@ export class LiveWorld {
     return this.bodies.size;
   }
 
-  /** Add a loose brick with its own dynamic body. */
   spawn(brick: Brick, options: SpawnOptions): void {
     if (this.bodies.has(brick.id) || brick.halfExtents.x <= 0) {
       return;
@@ -161,8 +138,6 @@ export class LiveWorld {
         })
         .setLinvel(linvel?.x ?? 0, linvel?.y ?? 0, linvel?.z ?? 0)
         .setAngvel(angvel ?? ZERO)
-        // No linear damping: it is drag, and drag is the one thing that would
-        // stop a falling brick from accelerating.
         .setLinearDamping(0)
         .setAngularDamping(0.6)
     );
@@ -240,12 +215,10 @@ export class LiveWorld {
     }
   }
 
-  /** Put a brick back exactly where a saved game left it, at rest. */
   restore(brick: Brick, position: Vector3, quaternion: Quaternion): void {
     this.spawn(brick, { position, quaternion });
   }
 
-  /** Let a brick go from outside the world, carrying the speed it was moving at. */
   drop(brick: Brick, velocity: Vector3): void {
     this.spawn(brick, {
       position: brick.object.position,
@@ -257,7 +230,6 @@ export class LiveWorld {
     }
   }
 
-  /** Drop a loose brick's body: it has either been placed or been reset away. */
   despawn(brickId: number): void {
     const body = this.bodies.get(brickId);
     if (!body) {
@@ -303,7 +275,6 @@ export class LiveWorld {
     this.statics.set(brick.id, collider);
   }
 
-  /** Take a placed brick back off the model, so it can be carried again. */
   removeStatic(brickId: number): void {
     const collider = this.statics.get(brickId);
     if (!collider) {
@@ -338,7 +309,6 @@ export class LiveWorld {
     return true;
   }
 
-  /** Move the hand. Called once a frame, before stepping. */
   moveHeld(position: Vector3, quaternion: Quaternion, dt: number): void {
     const { held } = this;
     if (!held) {
@@ -367,7 +337,6 @@ export class LiveWorld {
     });
   }
 
-  /** Let go. The brick keeps the hand's velocity, so a flick throws it. */
   release(): void {
     const { held } = this;
     if (!held) {
@@ -426,7 +395,6 @@ export class LiveWorld {
     }
   }
 
-  /** Copy every body's transform onto the brick it belongs to. */
   sync(bricks: Brick[]): void {
     for (const [id, body] of this.bodies) {
       const brick = bricks[id];
@@ -448,7 +416,6 @@ export class LiveWorld {
     }
   }
 
-  /** Read every loose brick's pose out, for the save file. */
   snapshot(): number[] {
     const out: number[] = [];
     for (const [id, body] of this.bodies) {
@@ -492,7 +459,6 @@ export class LiveWorld {
     }
   }
 
-  /** Run the solver forward with nothing drawn, for reduced-motion pours. */
   settleNow(steps: number): void {
     for (let i = 0; i < steps; i += 1) {
       this.world.step();
@@ -526,7 +492,6 @@ export class LiveWorld {
     }
   }
 
-  /** Remove every loose body, keeping the placed model's static colliders. */
   clearLoose(): void {
     this.held = null;
     for (const [, body] of this.bodies) {

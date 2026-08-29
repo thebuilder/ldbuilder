@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// Writes the gatehouse demo model in demo-models/, then leaves packing to
-// `pnpm ldraw:pack`.
-//
-// The LDraw library ships only two sample models (car and pyramid). Both are
-// small, both are single-file, so nothing bundled exercises navigating a model
-// made of submodels. Rather than redistribute somebody's recreation of a real
-// set, this one is generated from library parts.
-//
 // LDraw geometry notes, verified by measuring the parts:
 //   - Y points DOWN, so stacking upward means decreasing y.
 //   - A part's origin is the centre of its TOP face. It extends downward from
@@ -18,10 +10,6 @@
 //   - Studs sit on odd multiples of 10 in x and z. A part is on-grid when its
 //     own stud positions land on that lattice.
 //
-// `validate` at the bottom checks all of the above against the emitted file, so
-// an arithmetic slip fails the run rather than shipping a model that cannot be
-// built.
-
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ROOT } from "./lib/paths.mjs";
@@ -62,23 +50,10 @@ const PARTS = {
 const ref = (colour, x, y, z, file, matrix = IDENTITY) =>
   `1 ${colour} ${x} ${y} ${z} ${matrix} ${file}`;
 
-// ---------------------------------------------------------------------------
-// A gatehouse built from named submodels, with real build steps.
-//
-// Four corner towers and a wall span, each its own submodel, so the submodel
-// tree has something to isolate and bag labels have something to name
-// themselves after. Every submodel is referenced one brick height above the
-// courtyard's top face, which is what puts it on the plate rather than through
-// it.
-// ---------------------------------------------------------------------------
-
-/** Levels of 1x1 bricks in a tower, before the battlements go on. */
 const TOWER_LEVELS = 6;
 
-/** Courses of 2x4 bricks in the wall span. */
 const SPAN_COURSES = 3;
 
-/** Half the courtyard, in plates: 3 columns of 2x4 across, 5 rows deep. */
 const BASE_COLS = 1;
 const BASE_ROWS = 2;
 
@@ -106,8 +81,6 @@ function tower() {
     lines.push(ref(colour, STUD, y, -STUD, "3005.dat"));
     lines.push(ref(colour, -STUD, y, STUD, "3005.dat"));
     lines.push(ref(colour, STUD, y, STUD, "3005.dat"));
-    // A step every two levels: enough steps to scrub through, few enough that
-    // each one places a visible amount.
     if (level % 2 === 1) {
       lines.push("0 STEP");
     }
@@ -197,14 +170,9 @@ function buildGatehouse() {
   return files.map(([name, body]) => `0 FILE ${name}\n${body}`).join("\n");
 }
 
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
-
 const REF_LINE = /^1\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(?:\S+\s+){9}(\S+)\s*$/;
 const FILE_LINE = /^0\s+FILE\s+(.+)$/i;
 
-/** Split an .mpd into `name -> body lines`. */
 function splitFiles(text) {
   const files = new Map();
   let current = null;
@@ -227,7 +195,6 @@ function splitFiles(text) {
  * reference would need the box rotated with it, and silently treating one as
  * axis-aligned would make the check lie, so it throws instead.
  */
-/** Every type-1 line in `body`, resolved into the frame its parent sits in. */
 function referencesIn(body, name, ox, oy, oz) {
   const out = [];
   for (const line of body) {
@@ -252,7 +219,6 @@ function referencesIn(body, name, ox, oy, oz) {
   return out;
 }
 
-/** The space one placed part occupies. */
 const boxOf = (part, placed, trail) => ({
   bottom: placed.y + part.h,
   name: `${trail}${placed.target}`,
@@ -291,7 +257,6 @@ function placements(text) {
 const overlaps = (a, b) =>
   a.x0 < b.x1 && a.x1 > b.x0 && a.z0 < b.z1 && a.z1 > b.z0;
 
-/** Every part stands on the ground or on the top face of another part. */
 function unsupported(parts) {
   // Y points down, so the ground is the largest `bottom`.
   const ground = Math.max(...parts.map((p) => p.bottom));
@@ -328,11 +293,9 @@ function offGrid(parts) {
     );
 }
 
-/** True when two parts overlap in plan and their height ranges cross. */
 const sharesSpace = (a, b) =>
   overlaps(a, b) && a.top < b.bottom && b.top < a.bottom;
 
-/** No two parts share any space. */
 function collisions(parts) {
   const problems = [];
   for (let i = 0; i < parts.length; i += 1) {
@@ -347,7 +310,6 @@ function collisions(parts) {
   return problems;
 }
 
-/** Everything above, reported together so one run names every fault. */
 function validate(name, text) {
   const parts = placements(text);
   const problems = [

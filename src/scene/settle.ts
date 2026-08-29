@@ -25,19 +25,15 @@ import {
  * screen. Recording is roughly 500KB per bag, and only the open bag is kept.
  */
 
-/** Floats per brick per frame: position (3) plus quaternion (4). */
 const STRIDE = 7;
 
 const STEP_HZ = 60;
 const MAX_STEPS = 180;
 
 export interface SettleRecording {
-  /** frames x bricks x STRIDE, in bag order. */
   data: Float32Array;
-  /** Seconds of wall-clock the recording represents. */
   duration: number;
   frames: number;
-  /** Bag-order brick ids, so playback can find a brick's slot. */
   order: number[];
   slotOf: Map<number, number>;
 }
@@ -98,10 +94,6 @@ export function simulateBag(
   );
 
   const bodies = members.map((brick) => {
-    // Release above the spot the spiral chose, spread over a range of heights
-    // so bricks arrive over a few tenths of a second rather than in one slab.
-    // The spread is kept narrow: a wide one drags the tail of the animation out
-    // waiting for the last brick to come down.
     const lift = dropHeight * (0.5 + random() * 0.5);
     const spread = Math.max(brick.radius, 8) * 1.5;
     const start = new Vector3(
@@ -198,8 +190,6 @@ export function simulateBag(
     }
 
     frames = step + 1;
-    // Stop once everything has been still for a moment, so a bag that settles
-    // early does not pad the animation with a second of nothing happening.
     stillCount = moving === 0 ? stillCount + 1 : 0;
     if (stillCount >= 6) {
       break;
@@ -208,10 +198,6 @@ export function simulateBag(
 
   world.free();
 
-  // Physics keeps solving long after there is anything to look at: bricks creep
-  // and jitter by fractions of a unit for another second. Those frames still
-  // cost playback time, so the recording is cut back to the last frame where
-  // something moved far enough to see, plus a few to land on.
   frames = trimTail(data, frames, members.length, dropHeight * 0.012);
 
   const order = members.map((brick) => brick.id);
@@ -252,7 +238,6 @@ function trimTail(
       const dy = data[a + 1] - data[b + 1];
       const dz = data[a + 2] - data[b + 2];
       if (dx * dx + dy * dy + dz * dz > squared) {
-        // Keep a short run-out so the pile does not stop dead on impact.
         return Math.min(frames, frame + 4);
       }
     }
@@ -260,7 +245,6 @@ function trimTail(
   return frames;
 }
 
-/** Copy the recording's last frame into each brick's resting pose. */
 export function applyRestingPoses(
   recording: SettleRecording,
   bricks: Brick[]
@@ -288,7 +272,6 @@ export function applyRestingPoses(
   }
 }
 
-/** Read one brick's pose at a fractional frame, interpolating between steps. */
 export function sampleRecording(
   recording: SettleRecording,
   slot: number,

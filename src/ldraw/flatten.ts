@@ -58,20 +58,16 @@ function fileNameOf(object: Object3D): string {
  * place to be built. Staging needs the occurrences; the panel needs the files.
  */
 export interface InstanceNode {
-  /** Bricks directly in this occurrence, excluding those in nested ones. */
   brickIds: number[];
   children: number[];
   name: string;
-  /** Index into the instances array. -1 for an occurrence at the top level. */
   parent: number;
 }
 
 export interface FlattenResult {
   bounds: Box3;
   bricks: Brick[];
-  /** Bricks whose geometry was empty; usually a sign of an incomplete pack. */
   emptyBricks: number;
-  /** Every submodel occurrence, parents before children. */
   instances: InstanceNode[];
   root: Group;
   submodels: SubmodelNode;
@@ -86,9 +82,7 @@ export interface FlattenResult {
  * absolute rather than relative to a submodel that is itself moving. So the
  * nesting is flattened away and the submodel tree is recorded separately.
  */
-/** One brick found by the walk, before it becomes a `Brick`. */
 interface Collected {
-  /** Index into `instances`, or -1 when the brick sits in the main model. */
   instance: number;
   matrix: Matrix4;
   object: Object3D;
@@ -99,7 +93,6 @@ interface Collected {
 interface Collection {
   collected: Collected[];
   instances: InstanceNode[];
-  /** The submodel-file node for a path, created on first use. */
   nodeFor: (path: string[]) => SubmodelNode;
   submodelRoot: SubmodelNode;
 }
@@ -153,7 +146,6 @@ function collectBricks(raw: Object3D): Collection {
     submodelPath: string[],
     instance: number
   ): [string[], number] {
-    // The root itself is the main model, so it does not extend the path.
     if (object === raw || !(object as Group).isGroup) {
       return [submodelPath, instance];
     }
@@ -206,7 +198,6 @@ function collectBricks(raw: Object3D): Collection {
   return { collected, instances, nodeFor, submodelRoot };
 }
 
-/** Scratch for `measureCollider`, which runs once per brick of every model. */
 const localBox = new Box3();
 const geometryBox = new Box3();
 const toLocal = new Matrix4();
@@ -289,8 +280,7 @@ export function flattenModel(
         meshes.push(child);
       } else {
         child.raycast = () => {
-          // Only meshes are pickable; edge lines opt out here so the raycast
-          // never has to filter them.
+          // Only meshes are pickable.
         };
       }
     });
@@ -315,7 +305,6 @@ export function flattenModel(
         spin: 0,
         spinAxis: new Vector3(0, 1, 0),
       },
-      // Filled in by the layout pass once overall bounds are known.
       floorPose: {
         position: new Vector3(),
         quaternion: new Quaternion(),
@@ -332,7 +321,6 @@ export function flattenModel(
       partName: partNames[partFile.toLowerCase()] ?? partFile,
       radius: 0,
       step: item.step,
-      // Filled in by the subassembly pass, which needs the steps first.
       subassembly: -1,
       submodelPath: item.submodelPath,
     });
@@ -343,7 +331,6 @@ export function flattenModel(
 
   root.updateMatrixWorld(true);
 
-  // Per-brick bounds drive floor spacing, explode directions and height slicing.
   const bounds = new Box3();
   const box = new Box3();
   const sphere = new Sphere();
@@ -383,7 +370,6 @@ export function flattenModel(
   };
 }
 
-/** Group bricks into a bill of materials, keyed by part and colour. */
 export function buildBom(bricks: Brick[]): BomEntry[] {
   const map = new Map<string, BomEntry>();
 

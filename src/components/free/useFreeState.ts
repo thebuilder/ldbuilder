@@ -5,10 +5,8 @@ import { loadPalette, type Palette } from "@/ldraw/palette";
 import { type HotbarEntry, readHotbar, writeHotbar } from "@/lib/freeStore";
 import type { FreeController } from "@/scene/FreeController";
 
-/** Nine slots, on the number keys. */
 export const HOTBAR_SLOTS = 9;
 
-/** Red, and five of a part: the two answers that need no thought to change. */
 const DEFAULT_COLOR = 4;
 const DEFAULT_POUR = 5;
 
@@ -58,7 +56,6 @@ export function usePalette(): {
 
 export interface Hotbar {
   clear: (index: number) => void;
-  /** Pin a part, or unpin it if that part and colour is already up there. */
   pin: (file: string, colorCode: number) => void;
   slots: (HotbarEntry | null)[];
 }
@@ -116,9 +113,7 @@ export function useHotbar(): Hotbar {
 }
 
 export interface FreeActions {
-  /** Which hotbar slot was last reached for, so the bar can show it. */
   activeSlot: number | null;
-  /** The colour new parts come out in. */
   colorCode: number;
   pin: (file: string) => void;
   pour: (file: string, count: number) => void;
@@ -129,14 +124,6 @@ export interface FreeActions {
   take: (file: string) => void;
 }
 
-/**
- * Everything that means "reach for a part".
- *
- * Taking one out, tipping a handful onto the floor, pinning one to the hotbar
- * and reaching for a pinned one are four faces of the same thing, and all four
- * need the colour that is currently chosen. Kept together so the component that
- * draws the inventory does not also have to own how it is used.
- */
 export function useFreeActions(
   controller: RefObject<FreeController | null>,
   hotbar: Hotbar

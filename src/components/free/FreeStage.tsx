@@ -7,19 +7,10 @@ import type { FreeCallbacks, FreeController } from "@/scene/FreeController";
 export interface FreeStageProps {
   callbacks: FreeCallbacks;
   className?: string;
-  /** Handed the controller once it exists, and null when it goes away. */
   onController: (controller: FreeController | null) => void;
   palette: Palette;
 }
 
-/**
- * The canvas, and the controller that owns it.
- *
- * Free build is imperative in a way a scrubber is not: "take one out", "turn
- * it", "put it down" are commands, not state to re-render from. So the
- * controller is handed upward rather than driven by props, and React keeps only
- * what it has to draw.
- */
 export function FreeStage({
   palette,
   callbacks,

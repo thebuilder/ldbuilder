@@ -14,7 +14,6 @@ const LDRAW_ORG_DIRECTIVE = /^0\s+!LDRAW_ORG\s+(\S+)/i;
 const UNOFFICIAL_PREFIX = /^Unofficial_/i;
 const STEP_DIRECTIVE = /^0\s+STEP\b/i;
 
-/** Parse a packed .mpd into a map of lowercase name -> body, plus the root name. */
 function readMpd(text) {
   const files = new Map();
   const order = [];
@@ -60,13 +59,7 @@ function declaredType(body) {
   return "model";
 }
 
-/** A file is a brick if it is a Part or a Shortcut (a pre-assembled part group). */
 const isBrickType = (type) => type === "part" || type === "shortcut";
-
-/**
- * Walk the model tree the way the runtime does and count bricks and steps.
- * Descends through submodels; stops at anything that is a brick.
- */
 export function analyze(text) {
   const { files, root } = readMpd(text);
   let bricks = 0;
@@ -94,7 +87,6 @@ export function analyze(text) {
       partUse.set(childKey, (partUse.get(childKey) ?? 0) + 1);
       return null;
     }
-    // Unresolvable refs are already reported as hard errors by the packer.
     return childBody === undefined ? null : childKey;
   };
 

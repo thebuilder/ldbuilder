@@ -26,7 +26,6 @@ export function useFreeKeys({
   slots,
 }: FreeKeys): void {
   useEffect(() => {
-    /** Everything that acts on the brick in hand. */
     const onCarryKey = (event: KeyboardEvent, scene: FreeController) => {
       switch (event.code) {
         case "KeyR":
@@ -87,7 +86,6 @@ export function useFreeKeys({
 
 const DIGIT = /^Digit([1-9])$/;
 
-/** Grid steps, in the order the controller takes them. */
 const NUDGES: Record<string, [number, number, number] | undefined> = {
   ArrowDown: [0, 0, 1],
   ArrowLeft: [-1, 0, 0],

@@ -127,7 +127,6 @@ const GROUPS = [
   },
 ];
 
-/** Read just enough of a part file to know what it is. */
 function readHeader(text) {
   let description = null;
   let type = null;
@@ -192,7 +191,6 @@ function sortKey(entry) {
   return a * b * 1000 + (a + b) * 10 + c;
 }
 
-/** Every palette part the installed library can supply, grouped and ordered. */
 export async function selectPaletteParts(libraryDir) {
   const partsDir = path.join(libraryDir, "parts");
   const files = (await readdir(partsDir)).filter((name) =>

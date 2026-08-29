@@ -86,13 +86,6 @@ interface FreeHudProps {
   progress: FreeProgress | null;
 }
 
-/**
- * Everything floating over the floor.
- *
- * The parts box gets a full column of its own rather than whatever is left
- * between the other panels, because in this mode it is the thing you spend your
- * time in: a build uses five parts and the box holds two hundred.
- */
 function FreeHud(props: FreeHudProps) {
   const { palette, progress, hotbar, actions } = props;
   const placed = progress?.placed ?? 0;

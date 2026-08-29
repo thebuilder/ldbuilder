@@ -29,7 +29,6 @@ const CATEGORY = /^0\s+!CATEGORY\s+(.+)$/im;
 const KEYWORDS = /^0\s+!KEYWORDS\s+(.+)$/im;
 const LICENSE = /^0\s+!LICENSE\s+(.+)$/im;
 const REDISTRIBUTABLE = /CCAL/i;
-/** OMR set ids carry a variant suffix: `928-1`. */
 const HAS_VARIANT = /-\d+$/;
 
 /**
@@ -70,11 +69,6 @@ async function cacheDownload(file, text) {
   }
 }
 
-/**
- * Fetch one OMR set, caching the download.
- *
- * @returns {Promise<{ setId: string, text: string, metadata: object }>}
- */
 export async function fetchSet(id) {
   const setId = normalizeSetId(id);
   const cached = path.join(OMR_CACHE, `${setId}.mpd`);

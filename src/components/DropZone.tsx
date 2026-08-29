@@ -94,8 +94,6 @@ export function DropZone({ className = "" }: { className?: string }) {
     [router]
   );
 
-  // Accept a drop anywhere on the page, not just on the dashed box: people aim
-  // at the window, not at a target.
   useEffect(() => {
     const onDragEnter = (event: DragEvent) => {
       if (!event.dataTransfer?.types.includes("Files")) {

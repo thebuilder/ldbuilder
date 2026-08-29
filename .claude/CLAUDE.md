@@ -116,7 +116,34 @@ Biome's linter will catch most issues automatically. Focus your attention on:
 3. **Architecture decisions** - Component structure, data flow, and API design
 4. **Edge cases** - Handle boundary conditions and error states
 5. **User experience** - Accessibility, performance, and usability considerations
-6. **Documentation** - Add comments for complex logic, but prefer self-documenting code
+6. **Comments** - Keep only comments that prevent misuse or explain constraints the code cannot express
+
+---
+
+## Comments and writing
+
+Write comments only when the code cannot state an important constraint on its own.
+
+Keep comments that explain:
+
+- why an apparently simpler implementation is wrong;
+- a non-obvious invariant, browser bug, external contract, or performance constraint;
+- required licensing, attribution, generated-file, lint, or tooling instructions.
+
+Delete comments that:
+
+- narrate what the next line, function, type, prop, test, or assertion does;
+- restate a name in prose;
+- describe obvious control flow or UI copy;
+- justify ordinary code with a story, analogy, or user persona;
+- preserve implementation history that belongs in Git;
+- use several sentences where one precise sentence would do.
+
+Do not add JSDoc to private code unless it documents a contract that TypeScript cannot express. Do not comment test setup or assertions when the test name and values already explain them. Never use comments as section decoration.
+
+For prose, lead with the fact or instruction. Use short, concrete sentences and plain words. Remove throat-clearing, repetition, sales language, fake quotations, rhetorical contrasts, and claims that are not backed by code or evidence. Prefer deleting text to polishing text that adds no information.
+
+Before finishing, read every added or changed comment and sentence. If removing it would not make the code easier to misuse or materially harder to maintain, remove it.
 
 ---
 

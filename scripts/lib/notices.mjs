@@ -1,10 +1,3 @@
-// Turns an installed dependency tree into the text of NOTICES.md.
-//
-// Everything here is pure: the CLI in scripts/gen-notices.mjs does the running
-// and reading and hands the results over. That split is what makes the rules
-// below testable, and they are the part worth testing, because getting one
-// wrong means shipping a notice that quietly under-reports what it owes.
-
 /**
  * The platform suffix on a prebuilt binary package: `@next/swc-darwin-arm64`.
  *
@@ -15,7 +8,6 @@
 const PLATFORM_SUFFIX =
   /-(darwin|linux|linuxmusl|win32|freebsd|wasm32|webcontainers)[a-z0-9-]*$/;
 
-/** Files a package might keep its licence in. */
 export const LICENCE_FILE = /^(licen[cs]e|notice|copying)/i;
 
 /**
@@ -28,10 +20,8 @@ export const LICENCE_FILE = /^(licen[cs]e|notice|copying)/i;
  */
 export const TEXT_REQUIRED = /^(Apache|BSD|MIT|ISC|LGPL|MPL)/i;
 
-/** Weak copyleft carries obligations the permissive licences do not. */
 const COPYLEFT = /^(LGPL|GPL|MPL|EPL|CDDL)/i;
 
-/** Package names in a pnpm lockfile, without their version suffix. */
 export function lockfileNames(text) {
   const names = new Set();
   for (const [, name] of text.matchAll(
@@ -42,7 +32,6 @@ export function lockfileNames(text) {
   return names;
 }
 
-/** Flatten `pnpm licenses list --json`, which arrives grouped by licence id. */
 export function parseLicenceList(grouped) {
   const packages = [];
   for (const [license, entries] of Object.entries(grouped)) {
@@ -60,7 +49,6 @@ export function parseLicenceList(grouped) {
   return packages.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** The family prefix of a prebuilt package: `@img/sharp-darwin-arm64` -> `@img/sharp-`. */
 const familyPrefix = (name) => name.replace(PLATFORM_SUFFIX, "-");
 
 /**
@@ -110,7 +98,6 @@ export function groupByText(packages) {
   return groups;
 }
 
-/** Packages declaring a licence whose text they do not ship. */
 export const missingText = (packages) =>
   packages.filter((pkg) => pkg.text === null);
 
@@ -229,7 +216,6 @@ const PREAMBLE = [
   "",
 ];
 
-/** The whole of NOTICES.md. */
 export function renderNotices({ families, packages, usesNextImage }) {
   const lines = [
     ...PREAMBLE,

@@ -2,18 +2,9 @@ import { colorHex, isTranslucent } from "@/ldraw/colors.generated";
 
 export interface StudIconProps {
   colorCode: number;
-  /** Footprint in studs, as the part's description states it. */
   size: number[];
 }
 
-/**
- * A part, drawn as its studs.
- *
- * Rendering 194 little three.js previews to fill an inventory would cost more
- * than the scene behind it. What a person is actually scanning for is the
- * footprint and the colour, and a grid of dots carries both at eight pixels a
- * side. Parts with no stated footprint, like a wheel, get a plain tile.
- */
 export function StudIcon({ colorCode, size }: StudIconProps) {
   const [width = 0, depth = 0] = size;
   const columns = Math.min(Math.max(width, 1), 6);

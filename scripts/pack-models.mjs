@@ -1,15 +1,4 @@
 #!/usr/bin/env node
-// Packs the bundled sample models into self-contained .mpd files under
-// public/models, alongside a manifest the gallery reads.
-//
-//   pnpm ldraw:pack                 pack the curated list
-//   pnpm ldraw:pack --omr 928-1     pack an Official Model Repository set
-//   pnpm ldraw:pack path/to/x.ldr   pack one extra file into the gallery
-//   pnpm ldraw:pack x.ldr --skip-missing   drop parts that cannot be resolved
-//
-// Requires the parts library (pnpm ldraw:setup). Outputs are committed, so a
-// plain checkout can run the app without ever touching the library.
-
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { analyze } from "./lib/ldraw-analyze.mjs";
@@ -76,10 +65,6 @@ const CURATED = [
   },
 ];
 
-/**
- * Load one job's model text. A curated OMR entry is fetched and checked for its
- * redistribution licence; everything else is a file on disk.
- */
 async function readSource(job) {
   if (!job.omr) {
     return readFile(job.source, "utf8").then(
@@ -112,10 +97,6 @@ async function readSource(job) {
   }
 }
 
-/**
- * Log whatever went wrong with one pack. Returns true when the model must be
- * treated as a failure rather than shipped.
- */
 function reportPackProblems(job, missing, stats, skipMissing) {
   if (missing.length > 0 && !skipMissing) {
     // A silently incomplete pack renders as invisible bricks at runtime, which
@@ -203,12 +184,8 @@ async function main() {
     // no manifest yet
   }
 
-  // Read every source first. The loop below logs one line per model in order,
-  // so it must stay sequential; the file reads do not have to be.
   const sources = await Promise.all(jobs.map((job) => readSource(job)));
 
-  // Packing is independent per model given the shared index, so it all happens
-  // before the reporting loop, which has to stay ordered to read sensibly.
   const packed = await Promise.all(
     sources.map(async ({ job, text }) => {
       if (text === null) {

@@ -11,7 +11,6 @@ import { Moon, Sun } from "@/components/Icon";
  * the browser will resolve to, so rendering one before hydration guarantees the
  * wrong one for half the visitors, and it visibly swaps.
  */
-/** Blank until mounted: the server cannot know which theme will resolve. */
 function ToggleIcon({
   isDark,
   mounted,

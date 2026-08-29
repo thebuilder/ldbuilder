@@ -8,10 +8,6 @@ export interface Pose {
 }
 
 /**
- * One physical brick: a single Part or Shortcut instance, detached from the
- * loaded hierarchy so its transform can be animated independently.
- */
-/**
  * How one brick enters when its bag is tipped out. Seeded once at layout time
  * so a model always pours the same way, and so nothing has to be randomised
  * inside the per-frame loop.
@@ -64,16 +60,6 @@ export interface Brick {
   submodelPath: string[];
 }
 
-/**
- * A submodel occurrence that gets built off to the side and then attached.
- *
- * This is what an instruction booklet does when it takes you off to a corner of
- * the page to build a subassembly before showing you where it goes, and it is
- * the only honest way to show one: an LDraw file records every brick at its
- * final position in the finished model, so replaying the steps literally builds
- * a subassembly in mid-air, inside the silhouette of a model that does not
- * exist yet.
- */
 export interface Subassembly {
   /** Every brick in it, nested submodels included. */
   brickIds: number[];
@@ -159,12 +145,6 @@ export interface ModelData {
 
 export type ViewMode = "assemble" | "explode" | "slice";
 
-/**
- * The two flows.
- *
- * `watch` plays the model out step by step. `build` drops the bag on the floor
- * and makes you find the pieces and put them in yourself.
- */
 export type SessionMode = "build" | "watch";
 
 /** What build mode reports back for the HUD. Derived state, recomputed on change. */

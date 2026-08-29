@@ -17,14 +17,6 @@ export interface HotbarProps {
   slots: (HotbarSlot | null)[];
 }
 
-/**
- * Nine slots along the bottom, on the number keys.
- *
- * A build uses five or six parts over and over and the inventory holds two
- * hundred, so the hotbar is the difference between building and searching. It
- * remembers the colour as well as the part, because "red 2x4" and "black 2x4"
- * are two different things to reach for.
- */
 export function Hotbar({
   slots,
   active,
